@@ -15,6 +15,16 @@ O **ControLog** é uma plataforma desenvolvida para otimizar operações logíst
 
 ---
 
+## 👥 Público-Alvo
+
+O sistema é voltado para:
+
+- Pequenas e médias empresas de e-commerce
+- Operadores logísticos
+- Lojas que precisam organizar entregas e pedidos de forma eficiente
+
+---
+
 ## 🚀 Funcionalidades
 
 * 📦 Cadastro e gerenciamento de pedidos
