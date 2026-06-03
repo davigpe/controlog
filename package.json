@@ -1,0 +1,12 @@
+{
+  "name": "crontrolog",
+  "version": "1.0.0",
+  "description": "Sistema de gerenciamento logístico para e-commerce, focado em controle de pedidos, roteirização de entregas e análise de dados operacionais.",
+  "main": ".eslintrc.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
