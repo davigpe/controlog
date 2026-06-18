@@ -1,6 +1,6 @@
 # 🚚 ControLog
 
-Sistema de gerenciamento logístico para e-commerce, focado em controle de pedidos, roteirização de entregas e análise de dados operacionais.
+O ControLog foi idealizado para reduzir falhas no processo logístico de operações de e-commerce, melhorando o controle de pedidos, a organização das entregas e a eficiência das rotas.
 
 ---
 
