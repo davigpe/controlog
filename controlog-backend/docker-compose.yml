@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: controlog-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: controlog
+      POSTGRES_PASSWORD: controlog
+      POSTGRES_DB: controlog
+    ports:
+      # Porta 5433 no host — a 5432 já está em uso por um PostgreSQL nativo
+      # nesta máquina. O container continua ouvindo em 5432 internamente.
+      - "5433:5432"
+    volumes:
+      - controlog-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U controlog -d controlog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  controlog-db-data:
