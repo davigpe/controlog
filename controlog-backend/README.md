@@ -2,6 +2,8 @@
 
 Backend do Controlog, seguindo a arquitetura descrita no RFC (Node.js + Express + PostgreSQL, autenticação JWT).
 
+Em produção: https://controlog-backend-production.up.railway.app (hospedado no Railway — ver [`../docs/DEPLOY.md`](../docs/DEPLOY.md)).
+
 ## Stack
 
 - Node.js (ESM) + Express

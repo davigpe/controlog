@@ -4,6 +4,8 @@ Sistema de gestão logística para pequenas e médias empresas de transporte, co
 
 Este é o repositório do projeto de portfólio desenvolvido para a disciplina de Engenharia de Software (Católica SC). A especificação completa — contexto, personas, requisitos funcionais/não funcionais, regras de negócio e arquitetura — está no RFC do projeto.
 
+**🌐 Em produção:** [controlog-frontend-production.up.railway.app](https://controlog-frontend-production.up.railway.app) — login de teste `gestor@controlog.com` / `controlog123`.
+
 ---
 
 ## 📌 Sobre o projeto
@@ -51,7 +53,8 @@ controlog/
 │       └── lib/             # cliente HTTP (Axios) e utilitários
 ├── docs/
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
-│   └── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
+│   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
+│   └── DEPLOY.md                   # arquitetura de deploy, URLs e como reproduzir
 └── README.md
 ```
 
@@ -126,6 +129,16 @@ auditoria completa em navegador real (incluindo contraste de cor) quanto numa su
 regressão automatizada que roda junto dos testes do frontend. Resultado: zero
 violações nas 13 telas/estados auditados. Detalhes, metodologia e o que ficou fora do
 escopo em [`docs/AUDITORIA_ACESSIBILIDADE.md`](docs/AUDITORIA_ACESSIBILIDADE.md).
+
+---
+
+## 🚀 Deploy
+
+O projeto está publicado no **Railway** — frontend, backend e PostgreSQL rodando como
+três serviços no mesmo projeto (não usamos Vercel/Netlify/Firebase/Render, plataformas
+otimizadas só para frontend estático e fora de escopo para este trabalho a partir de
+2026-02). Migrations rodam automaticamente a cada deploy do backend. Detalhes completos,
+variáveis de ambiente e passo a passo para reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ---
 
