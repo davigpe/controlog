@@ -49,7 +49,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-gray-700 text-xs text-gray-500 text-center">
+      <div className="p-4 border-t border-gray-700 text-xs text-gray-400 text-center">
         Controlog v1.0
       </div>
     </aside>

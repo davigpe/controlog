@@ -1,15 +1,19 @@
-export type StatusMotorista = 'Ativo' | 'Em Rota' | 'Inativo'
+export type StatusMotorista = 'ATIVO' | 'INATIVO'
 
 export interface Motorista {
   id: string
   nome: string
   cnh: string
-  categoriaCnh: string
   telefone: string
-  email: string
   status: StatusMotorista
-  veiculo: string
+  emRota: boolean
   entregasRealizadas: number
-  dataAdmissao: string
-  observacoes?: string
+  criadoEm: string
+}
+
+export interface MotoristaInput {
+  nome: string
+  cnh: string
+  telefone: string
+  status?: StatusMotorista
 }

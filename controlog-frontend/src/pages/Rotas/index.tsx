@@ -2,91 +2,39 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search } from 'lucide-react';
-import type { Rota } from './types';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/api';
+import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import type { Rota, RotaInput } from './types';
 import RotasTable from './RotasTable';
 import RotaModal from './RotaModal';
 import RotaDetalhes from './RotaDetalhes';
-
-const rotasMock: Rota[] = [
-  {
-    id: '1',
-    codigo: 'RT-001',
-    origem: 'Joinville, SC',
-    destino: 'Florianópolis, SC',
-    motorista: 'Carlos Silva',
-    veiculo: 'Mercedes Sprinter - ABC-1234',
-    status: 'ativa',
-    dataHora: '2026-06-02T08:00:00',
-    coordenadasOrigem: [-26.3045, -48.8487],
-    coordenadasDestino: [-27.5954, -48.548],
-  },
-  {
-    id: '2',
-    codigo: 'RT-002',
-    origem: 'Curitiba, PR',
-    destino: 'São Paulo, SP',
-    motorista: 'Ana Souza',
-    veiculo: 'Volvo FH - DEF-5678',
-    status: 'concluida',
-    dataHora: '2026-06-01T14:00:00',
-    coordenadasOrigem: [-25.4284, -49.2733],
-    coordenadasDestino: [-23.5505, -46.6333],
-  },
-  {
-    id: '3',
-    codigo: 'RT-003',
-    origem: 'Porto Alegre, RS',
-    destino: 'Joinville, SC',
-    motorista: 'Roberto Lima',
-    veiculo: 'Scania R450 - GHI-9012',
-    status: 'cancelada',
-    dataHora: '2026-06-02T10:30:00',
-    coordenadasOrigem: [-30.0346, -51.2177],
-    coordenadasDestino: [-26.3045, -48.8487],
-  },
-  {
-    id: '4',
-    codigo: 'RT-004',
-    origem: 'Blumenau, SC',
-    destino: 'Curitiba, PR',
-    motorista: 'Fernanda Costa',
-    veiculo: 'Ford Cargo - JKL-3456',
-    status: 'ativa',
-    dataHora: '2026-06-02T09:15:00',
-    coordenadasOrigem: [-26.9194, -49.0661],
-    coordenadasDestino: [-25.4284, -49.2733],
-  },
-];
+import { useCreateRota, useDeleteRota, useRotas, useUpdateRota } from './api';
 
 export default function RotasPage() {
-  const [rotas, setRotas] = useState<Rota[]>(rotasMock);
   const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [rotaEditando, setRotaEditando] = useState<Rota | null>(null);
   const [rotaDetalhes, setRotaDetalhes] = useState<Rota | null>(null);
+  const [excluindo, setExcluindo] = useState<Rota | null>(null);
 
-  const rotasFiltradas = rotas.filter((r) =>
-    [r.codigo, r.origem, r.destino, r.motorista, r.veiculo]
-      .join(' ')
-      .toLowerCase()
-      .includes(busca.toLowerCase())
-  );
+  const { data: rotas = [], isLoading } = useRotas({ busca: busca || undefined });
+  const createMutation = useCreateRota();
+  const updateMutation = useUpdateRota();
+  const deleteMutation = useDeleteRota();
 
-  const handleSalvar = (data: Omit<Rota, 'id' | 'coordenadasOrigem' | 'coordenadasDestino'>) => {
-    if (rotaEditando) {
-      setRotas((prev) =>
-        prev.map((r) => (r.id === rotaEditando.id ? { ...rotaEditando, ...data } : r))
-      );
-    } else {
-      const nova: Rota = {
-        ...data,
-        id: String(Date.now()),
-        coordenadasOrigem: [-26.3045, -48.8487],
-        coordenadasDestino: [-27.5954, -48.548],
-      };
-      setRotas((prev) => [nova, ...prev]);
-    }
-    setRotaEditando(null);
+  const handleSalvar = (data: RotaInput) => {
+    const mutation = rotaEditando
+      ? updateMutation.mutateAsync({ id: rotaEditando.id, data })
+      : createMutation.mutateAsync(data);
+
+    mutation
+      .then(() => {
+        toast.success(rotaEditando ? 'Rota atualizada.' : 'Rota criada.');
+        setModalAberto(false);
+        setRotaEditando(null);
+      })
+      .catch((error) => toast.error(getErrorMessage(error)));
   };
 
   const handleEditar = (rota: Rota) => {
@@ -94,8 +42,18 @@ export default function RotasPage() {
     setModalAberto(true);
   };
 
-  const handleExcluir = (id: string) => {
-    setRotas((prev) => prev.filter((r) => r.id !== id));
+  const handleExcluir = () => {
+    if (!excluindo) return;
+    deleteMutation
+      .mutateAsync(excluindo.id)
+      .then(() => {
+        toast.success('Rota excluída.');
+        setExcluindo(null);
+      })
+      .catch((error) => {
+        toast.error(getErrorMessage(error, 'Não foi possível excluir esta rota.'));
+        setExcluindo(null);
+      });
   };
 
   return (
@@ -129,12 +87,18 @@ export default function RotasPage() {
       </div>
 
       {/* Tabela */}
-      <RotasTable
-        rotas={rotasFiltradas}
-        onVerDetalhes={setRotaDetalhes}
-        onEditar={handleEditar}
-        onExcluir={handleExcluir}
-      />
+      {isLoading ? (
+        <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
+          Carregando rotas...
+        </div>
+      ) : (
+        <RotasTable
+          rotas={rotas}
+          onVerDetalhes={setRotaDetalhes}
+          onEditar={handleEditar}
+          onExcluir={setExcluindo}
+        />
+      )}
 
       {/* Modal Criar/Editar */}
       <RotaModal
@@ -142,6 +106,7 @@ export default function RotasPage() {
         onClose={() => setModalAberto(false)}
         onSave={handleSalvar}
         rotaEditando={rotaEditando}
+        saving={createMutation.isPending || updateMutation.isPending}
       />
 
       {/* Modal Detalhes + Mapa */}
@@ -149,6 +114,15 @@ export default function RotasPage() {
         rota={rotaDetalhes}
         open={!!rotaDetalhes}
         onClose={() => setRotaDetalhes(null)}
+      />
+
+      <ConfirmDialog
+        open={!!excluindo}
+        title="Excluir rota"
+        description={`Tem certeza que deseja excluir a rota "${excluindo?.codigo}"? Rotas com entregas pendentes vinculadas não podem ser excluídas (RN08).`}
+        loading={deleteMutation.isPending}
+        onConfirm={handleExcluir}
+        onCancel={() => setExcluindo(null)}
       />
     </div>
   );

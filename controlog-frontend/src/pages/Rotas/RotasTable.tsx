@@ -6,16 +6,16 @@ import { ptBR } from 'date-fns/locale';
 import type { Rota } from './types';
 
 const statusConfig = {
-  ativa: { label: 'Ativa', className: 'bg-green-100 text-green-700' },
-  concluida: { label: 'Concluída', className: 'bg-blue-100 text-blue-700' },
-  cancelada: { label: 'Cancelada', className: 'bg-red-100 text-red-700' },
+  ATIVA: { label: 'Ativa', className: 'bg-green-100 text-green-700' },
+  CONCLUIDA: { label: 'Concluída', className: 'bg-blue-100 text-blue-700' },
+  CANCELADA: { label: 'Cancelada', className: 'bg-red-100 text-red-700' },
 };
 
 interface Props {
   rotas: Rota[];
   onVerDetalhes: (rota: Rota) => void;
   onEditar: (rota: Rota) => void;
-  onExcluir: (id: string) => void;
+  onExcluir: (rota: Rota) => void;
 }
 
 export default function RotasTable({ rotas, onVerDetalhes, onEditar, onExcluir }: Props) {
@@ -47,8 +47,8 @@ export default function RotasTable({ rotas, onVerDetalhes, onEditar, onExcluir }
                 <tr key={rota.id} className="border-t hover:bg-muted/40 transition-colors">
                   <td className="px-4 py-3 font-medium">{rota.codigo}</td>
                   <td className="px-4 py-3">{rota.origem} → {rota.destino}</td>
-                  <td className="px-4 py-3">{rota.motorista}</td>
-                  <td className="px-4 py-3">{rota.veiculo}</td>
+                  <td className="px-4 py-3">{rota.motorista.nome}</td>
+                  <td className="px-4 py-3">{rota.veiculo.modelo} — {rota.veiculo.placa}</td>
                   <td className="px-4 py-3">
                     <Badge className={status.className}>{status.label}</Badge>
                   </td>
@@ -57,17 +57,18 @@ export default function RotasTable({ rotas, onVerDetalhes, onEditar, onExcluir }
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center gap-2">
-                      <Button size="icon" variant="ghost" onClick={() => onVerDetalhes(rota)}>
+                      <Button size="icon" variant="ghost" aria-label={`Ver detalhes de ${rota.codigo}`} onClick={() => onVerDetalhes(rota)}>
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => onEditar(rota)}>
+                      <Button size="icon" variant="ghost" aria-label={`Editar ${rota.codigo}`} onClick={() => onEditar(rota)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label={`Excluir ${rota.codigo}`}
                         className="text-red-500 hover:text-red-600"
-                        onClick={() => onExcluir(rota.id)}
+                        onClick={() => onExcluir(rota)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

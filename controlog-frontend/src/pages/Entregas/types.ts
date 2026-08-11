@@ -1,15 +1,23 @@
-export type StatusEntrega = 'Concluída' | 'Em Rota' | 'Pendente' | 'Cancelada'
+export type StatusEntrega = 'PENDENTE' | 'EM_TRANSITO' | 'ENTREGUE' | 'CANCELADA'
 
 export interface Entrega {
   id: string
-  cliente: string
+  codigo: string
   destino: string
-  endereco: string
-  motorista: string
-  veiculo: string
   status: StatusEntrega
   dataPrevista: string
-  dataConclusao?: string
-  peso: string
-  observacoes?: string
+  dataEfetiva?: string | null
+  criadoEm: string
+  rota: { id: string; codigo: string }
+  motorista: { id: string; nome: string }
+}
+
+export interface EntregaInput {
+  codigo: string
+  rotaId: string
+  motoristaId: string
+  destino: string
+  status?: StatusEntrega
+  dataPrevista: string
+  dataEfetiva?: string
 }

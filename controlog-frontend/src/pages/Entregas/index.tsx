@@ -1,57 +1,73 @@
-import { useState, useMemo } from 'react'
-import { Search, Filter, Plus, Eye } from 'lucide-react'
-import EntregaModal from './EntregaModal'
-import EntregaForm from './EntregaForm'
-import type { Entrega, StatusEntrega } from './types'
+import { useState } from 'react'
+import { Search, Filter, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { getErrorMessage } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import EntregaDetalhes from './EntregaDetalhes'
+import EntregaFormModal from './EntregaFormModal'
+import { useCreateEntrega, useDeleteEntrega, useEntregas, useUpdateEntrega } from './api'
+import type { Entrega, EntregaInput, StatusEntrega } from './types'
 
-// ─── Dados mockados ────────────────────────────────────────────────────────────
-const initialEntregas: Entrega[] = [
-  { id: '#001', cliente: 'Metalúrgica Sul',       destino: 'Joinville, SC',          endereco: 'Rua das Indústrias, 500 - Joinville, SC',            motorista: 'João Silva',   veiculo: 'Ford Cargo - ABC-1234',         status: 'Concluída', dataPrevista: '01/06/2025', dataConclusao: '01/06/2025', peso: '1.200 kg', observacoes: 'Entregar no portão lateral.' },
-  { id: '#002', cliente: 'Comércio ABC',          destino: 'São Paulo, SP',           endereco: 'Av. Paulista, 1200 - São Paulo, SP',                  motorista: 'Carlos Melo',  veiculo: 'VW Delivery - DEF-5678',        status: 'Em Rota',   dataPrevista: '02/06/2025', peso: '850 kg' },
-  { id: '#003', cliente: 'Distribuidora XYZ',     destino: 'Curitiba, PR',            endereco: 'Rua XV de Novembro, 300 - Curitiba, PR',              motorista: '-',            veiculo: '-',                             status: 'Pendente',  dataPrevista: '03/06/2025', peso: '2.000 kg', observacoes: 'Aguardando confirmação do cliente.' },
-  { id: '#004', cliente: 'Indústria Norte',       destino: 'Florianópolis, SC',       endereco: 'Rod. SC-401, km 12 - Florianópolis, SC',              motorista: 'Pedro Lima',   veiculo: 'Mercedes Axor - GHI-9012',      status: 'Em Rota',   dataPrevista: '02/06/2025', peso: '3.500 kg' },
-  { id: '#005', cliente: 'Loja Central',          destino: 'Blumenau, SC',            endereco: 'Rua XV de Novembro, 800 - Blumenau, SC',              motorista: 'Ana Costa',    veiculo: 'Ford Cargo - JKL-3456',         status: 'Concluída', dataPrevista: '31/05/2025', dataConclusao: '31/05/2025', peso: '600 kg' },
-  { id: '#006', cliente: 'Supermercado BomPreço', destino: 'Chapecó, SC',             endereco: 'Av. Getúlio Vargas, 450 - Chapecó, SC',               motorista: 'Lucas Dias',   veiculo: 'VW Constellation - MNO-7890',   status: 'Em Rota',   dataPrevista: '03/06/2025', peso: '4.200 kg' },
-  { id: '#007', cliente: 'Farmácia Saúde',        destino: 'Itajaí, SC',              endereco: 'Rua Lauro Müller, 200 - Itajaí, SC',                  motorista: 'João Silva',   veiculo: 'Ford Cargo - ABC-1234',         status: 'Pendente',  dataPrevista: '04/06/2025', peso: '320 kg',  observacoes: 'Carga frágil, manusear com cuidado.' },
-  { id: '#008', cliente: 'Construtora Alpha',     destino: 'Balneário Camboriú, SC',  endereco: 'Av. Brasil, 900 - Balneário Camboriú, SC',             motorista: 'Pedro Lima',   veiculo: 'Mercedes Axor - GHI-9012',      status: 'Cancelada', dataPrevista: '01/06/2025', peso: '5.000 kg', observacoes: 'Cancelado a pedido do cliente.' },
-  { id: '#009', cliente: 'TechStore',             destino: 'Lages, SC',               endereco: 'Rua Caetano Vieira, 50 - Lages, SC',                  motorista: 'Ana Costa',    veiculo: 'Ford Cargo - JKL-3456',         status: 'Concluída', dataPrevista: '30/05/2025', dataConclusao: '30/05/2025', peso: '780 kg' },
-  { id: '#010', cliente: 'Agropecuária Boa Terra',destino: 'Criciúma, SC',            endereco: 'Av. Universitária, 1100 - Criciúma, SC',              motorista: 'Carlos Melo',  veiculo: 'VW Delivery - DEF-5678',        status: 'Pendente',  dataPrevista: '05/06/2025', peso: '1.800 kg' },
-]
-
-const statusOptions: StatusEntrega[] = ['Concluída', 'Em Rota', 'Pendente', 'Cancelada']
+const statusOptions: StatusEntrega[] = ['PENDENTE', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA']
 
 const statusStyle: Record<StatusEntrega, string> = {
-  'Concluída': 'bg-green-100 text-green-700',
-  'Em Rota':   'bg-yellow-100 text-yellow-700',
-  'Pendente':  'bg-red-100 text-red-700',
-  'Cancelada': 'bg-gray-100 text-gray-500',
+  ENTREGUE: 'bg-green-100 text-green-700',
+  EM_TRANSITO: 'bg-yellow-100 text-yellow-700',
+  PENDENTE: 'bg-red-100 text-red-700',
+  CANCELADA: 'bg-gray-100 text-gray-700',
+}
+
+const statusLabel: Record<StatusEntrega, string> = {
+  PENDENTE: 'Pendente',
+  EM_TRANSITO: 'Em Trânsito',
+  ENTREGUE: 'Entregue',
+  CANCELADA: 'Cancelada',
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export default function Entregas() {
-  const [entregas, setEntregas]           = useState<Entrega[]>(initialEntregas)
-  const [search, setSearch]               = useState('')
-  const [statusFilter, setStatusFilter]   = useState<StatusEntrega | 'Todos'>('Todos')
-  const [selected, setSelected]           = useState<Entrega | null>(null)
-  const [showForm, setShowForm]           = useState(false)
+  const [search, setSearch]             = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusEntrega | 'Todos'>('Todos')
+  const [selected, setSelected]         = useState<Entrega | null>(null)
+  const [editando, setEditando]         = useState<Entrega | null>(null)
+  const [formAberto, setFormAberto]     = useState(false)
+  const [excluindo, setExcluindo]       = useState<Entrega | null>(null)
 
-  function handleSave(nova: Entrega) {
-    setEntregas((prev) => [nova, ...prev])
+  const { data: entregas = [], isLoading } = useEntregas({
+    busca: search || undefined,
+    status: statusFilter === 'Todos' ? undefined : statusFilter,
+  })
+  const createMutation = useCreateEntrega()
+  const updateMutation = useUpdateEntrega()
+  const deleteMutation = useDeleteEntrega()
+
+  function handleSave(data: EntregaInput) {
+    const mutation = editando
+      ? updateMutation.mutateAsync({ id: editando.id, data })
+      : createMutation.mutateAsync(data)
+
+    mutation
+      .then(() => {
+        toast.success(editando ? 'Entrega atualizada.' : 'Entrega cadastrada.')
+        setFormAberto(false)
+        setEditando(null)
+      })
+      .catch((error) => toast.error(getErrorMessage(error)))
   }
 
-  const filtered = useMemo(() => {
-    return entregas.filter((e) => {
-      const matchSearch =
-        e.id.toLowerCase().includes(search.toLowerCase())         ||
-        e.cliente.toLowerCase().includes(search.toLowerCase())    ||
-        e.destino.toLowerCase().includes(search.toLowerCase())    ||
-        e.motorista.toLowerCase().includes(search.toLowerCase())
-
-      const matchStatus = statusFilter === 'Todos' || e.status === statusFilter
-
-      return matchSearch && matchStatus
-    })
-  }, [entregas, search, statusFilter])
+  function handleExcluir() {
+    if (!excluindo) return
+    deleteMutation
+      .mutateAsync(excluindo.id)
+      .then(() => {
+        toast.success('Entrega excluída.')
+        setExcluindo(null)
+      })
+      .catch((error) => {
+        toast.error(getErrorMessage(error, 'Não foi possível excluir esta entrega.'))
+        setExcluindo(null)
+      })
+  }
 
   return (
     <div className="space-y-5">
@@ -60,10 +76,10 @@ export default function Entregas() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Entregas</h1>
-          <p className="text-sm text-gray-500">{filtered.length} registros encontrados</p>
+          <p className="text-sm text-gray-600">{entregas.length} registros encontrados</p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => { setEditando(null); setFormAberto(true) }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
         >
           <Plus size={16} />
@@ -77,7 +93,7 @@ export default function Entregas() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por ID, cliente, destino ou motorista..."
+            placeholder="Buscar por código, destino, motorista ou rota..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -97,7 +113,7 @@ export default function Entregas() {
                     : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
                 }`}
               >
-                {s}
+                {s === 'Todos' ? 'Todos' : statusLabel[s]}
               </button>
             ))}
           </div>
@@ -108,47 +124,66 @@ export default function Entregas() {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 uppercase text-xs border-b border-gray-100">
+            <thead className="bg-gray-50 text-gray-600 uppercase text-xs border-b border-gray-100">
               <tr>
-                <th className="px-6 py-3 text-left">ID</th>
-                <th className="px-6 py-3 text-left">Cliente</th>
+                <th className="px-6 py-3 text-left">Código</th>
+                <th className="px-6 py-3 text-left">Rota</th>
                 <th className="px-6 py-3 text-left">Destino</th>
                 <th className="px-6 py-3 text-left">Motorista</th>
                 <th className="px-6 py-3 text-left">Prev. Entrega</th>
-                <th className="px-6 py-3 text-left">Peso</th>
                 <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-600 text-sm">
+                    Carregando entregas...
+                  </td>
+                </tr>
+              ) : entregas.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-600 text-sm">
                     Nenhuma entrega encontrada para os filtros aplicados.
                   </td>
                 </tr>
               ) : (
-                filtered.map((entrega) => (
+                entregas.map((entrega) => (
                   <tr key={entrega.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-700">{entrega.id}</td>
-                    <td className="px-6 py-4 text-gray-600">{entrega.cliente}</td>
+                    <td className="px-6 py-4 font-medium text-gray-700">{entrega.codigo}</td>
+                    <td className="px-6 py-4 text-gray-600">{entrega.rota.codigo}</td>
                     <td className="px-6 py-4 text-gray-600">{entrega.destino}</td>
-                    <td className="px-6 py-4 text-gray-600">{entrega.motorista}</td>
-                    <td className="px-6 py-4 text-gray-600">{entrega.dataPrevista}</td>
-                    <td className="px-6 py-4 text-gray-600">{entrega.peso}</td>
+                    <td className="px-6 py-4 text-gray-600">{entrega.motorista.nome}</td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle[entrega.status]}`}>
-                        {entrega.status}
+                        {statusLabel[entrega.status]}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => setSelected(entrega)}
-                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
-                      >
-                        <Eye size={14} />
-                        Detalhes
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setSelected(entrega)} className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors">
+                          <Eye size={14} />
+                          Detalhes
+                        </button>
+                        <button
+                          onClick={() => { setEditando(entrega); setFormAberto(true) }}
+                          aria-label={`Editar ${entrega.codigo}`}
+                          className="text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => setExcluindo(entrega)}
+                          aria-label={`Excluir ${entrega.codigo}`}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -159,8 +194,22 @@ export default function Entregas() {
       </div>
 
       {/* ── Modais ── */}
-      <EntregaModal entrega={selected} onClose={() => setSelected(null)} />
-      {showForm && <EntregaForm onClose={() => setShowForm(false)} onSave={handleSave} />}
+      <EntregaDetalhes entrega={selected} onClose={() => setSelected(null)} />
+      <EntregaFormModal
+        open={formAberto}
+        entregaEditando={editando}
+        onClose={() => { setFormAberto(false); setEditando(null) }}
+        onSave={handleSave}
+        saving={createMutation.isPending || updateMutation.isPending}
+      />
+      <ConfirmDialog
+        open={!!excluindo}
+        title="Excluir entrega"
+        description={`Tem certeza que deseja excluir a entrega "${excluindo?.codigo}"? Esta ação não pode ser desfeita.`}
+        loading={deleteMutation.isPending}
+        onConfirm={handleExcluir}
+        onCancel={() => setExcluindo(null)}
+      />
 
     </div>
   )

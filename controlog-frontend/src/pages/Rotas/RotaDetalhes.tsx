@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -6,9 +6,9 @@ import type { Rota } from './types';
 import RotaMapa from './RotaMapa';
 
 const statusConfig = {
-  ativa: { label: 'Ativa', className: 'bg-green-100 text-green-700' },
-  concluida: { label: 'Concluída', className: 'bg-blue-100 text-blue-700' },
-  cancelada: { label: 'Cancelada', className: 'bg-red-100 text-red-700' },
+  ATIVA: { label: 'Ativa', className: 'bg-green-100 text-green-700' },
+  CONCLUIDA: { label: 'Concluída', className: 'bg-blue-100 text-blue-700' },
+  CANCELADA: { label: 'Cancelada', className: 'bg-red-100 text-red-700' },
 };
 
 interface Props {
@@ -27,6 +27,9 @@ export default function RotaDetalhes({ rota, open, onClose }: Props) {
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Detalhes da Rota — {rota.codigo}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Detalhes da rota {rota.codigo}, de {rota.origem} para {rota.destino}, com mapa de origem e destino.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -41,11 +44,11 @@ export default function RotaDetalhes({ rota, open, onClose }: Props) {
             </div>
             <div>
               <span className="text-muted-foreground">Motorista</span>
-              <p className="font-medium">{rota.motorista}</p>
+              <p className="font-medium">{rota.motorista.nome}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Veículo</span>
-              <p className="font-medium">{rota.veiculo}</p>
+              <p className="font-medium">{rota.veiculo.modelo} — {rota.veiculo.placa}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Status</span>

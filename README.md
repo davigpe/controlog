@@ -1,109 +1,143 @@
-# 🚚 ControLog
+# 🚚 Controlog
 
-Sistema de gerenciamento logístico para e-commerce, focado em controle de pedidos, roteirização de entregas e análise de dados operacionais.
+Sistema de gestão logística para pequenas e médias empresas de transporte, com controle centralizado de rotas, motoristas, veículos e entregas.
 
----
-
-## 📌 Sobre o Projeto
-
-O **ControLog** é uma plataforma desenvolvida para otimizar operações logísticas de e-commerce, permitindo:
-
-* Gerenciamento de pedidos
-* Organização de entregas
-* Criação de rotas eficientes
-* Análise de dados logísticos
+Este é o repositório do projeto de portfólio desenvolvido para a disciplina de Engenharia de Software (Católica SC). A especificação completa — contexto, personas, requisitos funcionais/não funcionais, regras de negócio e arquitetura — está no RFC do projeto.
 
 ---
 
-## 🚀 Funcionalidades
+## 📌 Sobre o projeto
 
-* 📦 Cadastro e gerenciamento de pedidos
-* 🚚 Criação e otimização de rotas de entrega
-* 📊 Dashboard com métricas operacionais
-* 👤 Gestão de usuários (admin / operador)
-* 🗺️ Visualização geográfica das entregas (futuro)
+O Controlog substitui o controle de rotas e entregas feito hoje em planilhas e WhatsApp por uma plataforma web única, permitindo:
 
----
-
-## 🛠️ Tecnologias
-
-(Ajustar conforme o projeto)
-
-* Frontend: React / Flutter / etc
-* Backend: Node.js / Express
-* Banco de Dados: MongoDB / Firestore
-* Autenticação: JWT
+* Cadastro e acompanhamento de rotas, motoristas e veículos
+* Gestão do ciclo de vida das entregas (pendente → em trânsito → entregue/cancelada)
+* Dashboard com indicadores operacionais em tempo real
+* Relatórios filtráveis por período, com motoristas mais ativos e distribuição por status
+* Visualização de rotas em mapa interativo (origem/destino)
 
 ---
 
-## 📁 Estrutura do Projeto
+## 🛠️ Stack tecnológica
 
-controLog/
+| Camada | Tecnologias |
+|---|---|
+| Frontend | React 19 + TypeScript, Vite, TailwindCSS, shadcn/ui, TanStack Query, React Hook Form + Zod, Zustand, Leaflet, Recharts |
+| Backend | Node.js + Express, Prisma ORM, PostgreSQL, JWT (access + refresh token), bcrypt, Zod |
+| Testes | Jest + Supertest (backend) · Vitest + Testing Library (frontend) |
+| Infra local | Docker Compose (PostgreSQL) |
 
-├── frontend/
-├── backend/
+---
+
+## 📁 Estrutura do repositório
+
+```
+controlog/
+├── controlog-backend/     # API REST (Node.js + Express + Prisma + PostgreSQL)
+│   ├── prisma/             # schema, migrations e seed
+│   ├── src/
+│   │   ├── routes/         # definição das rotas HTTP
+│   │   ├── controllers/    # adaptam request/response aos services
+│   │   ├── services/       # regras de negócio (RN01–RN08)
+│   │   ├── middlewares/    # auth (JWT), validação, tratamento de erros
+│   │   └── validators/     # schemas Zod de entrada
+│   ├── tests/               # testes unitários (Jest)
+│   └── README.md            # setup detalhado do backend
+├── controlog-frontend/    # SPA (React + TypeScript + Vite)
+│   └── src/
+│       ├── pages/           # um módulo por entidade (Rotas, Motoristas, Veículos, Entregas, Dashboard, Relatórios, Login)
+│       ├── components/      # layout, UI (shadcn) e componentes compartilhados
+│       ├── stores/          # estado de autenticação (Zustand)
+│       └── lib/             # cliente HTTP (Axios) e utilitários
 ├── docs/
+│   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
+│   └── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
 └── README.md
+```
 
 ---
 
-## ⚙️ Como rodar o projeto
+## ⚙️ Como rodar o projeto localmente
 
-### 1. Clonar o repositório
+O projeto tem duas partes que rodam separadamente: a API (`controlog-backend`) e a interface web (`controlog-frontend`). Ambas precisam estar de pé ao mesmo tempo.
 
-git clone https://github.com/davigpe/controlog.git
+### Pré-requisitos
 
-### 2. Instalar dependências
+* Node.js 20+
+* Docker Desktop (para o PostgreSQL local)
 
-cd controlog
+### 1. Banco de dados
+
+```bash
+cd controlog-backend
+cp .env.example .env
+docker compose up -d
+```
+
+### 2. Backend
+
+```bash
+cd controlog-backend
 npm install
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed   # cria dados de exemplo e um usuário gestor de teste
+npm run dev           # http://localhost:3333
+```
 
-### 3. Rodar o projeto
+Login de teste criado pelo seed: `gestor@controlog.com` / `controlog123`.
 
-npm run dev
+Detalhes completos (variáveis de ambiente, endpoints, regras de negócio implementadas) em [`controlog-backend/README.md`](controlog-backend/README.md).
+
+### 3. Frontend
+
+```bash
+cd controlog-frontend
+npm install
+npm run dev            # http://localhost:5173
+```
+
+---
+
+## ✅ Testes
+
+Backend e frontend têm cobertura de testes automatizados acima da meta de 70% definida no RFC (RNF07):
+
+```bash
+# Backend — Jest + Supertest (Prisma Client mockado, não precisa do banco rodando)
+cd controlog-backend
+npm test
+npm run test:coverage
+
+# Frontend — Vitest + Testing Library (API mockada, não precisa do backend rodando)
+cd controlog-frontend
+npm test
+npm run test:coverage
+```
+
+Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio.
+
+---
+
+## ♿ Acessibilidade
+
+A interface foi auditada contra WCAG 2.1 nível AA (RNF06) com `axe-core` — tanto numa
+auditoria completa em navegador real (incluindo contraste de cor) quanto numa suíte de
+regressão automatizada que roda junto dos testes do frontend. Resultado: zero
+violações nas 13 telas/estados auditados. Detalhes, metodologia e o que ficou fora do
+escopo em [`docs/AUDITORIA_ACESSIBILIDADE.md`](docs/AUDITORIA_ACESSIBILIDADE.md).
 
 ---
 
 ## 👥 Colaboração
 
-Este projeto está sendo desenvolvido em equipe. Para contribuir:
-
-1. Crie uma branch:
-   git checkout -b minha-feature
-
-2. Faça commits claros:
-   git commit -m "feat: adiciona cadastro de pedidos"
-
-3. Envie para o repositório:
-   git push origin minha-feature
-
+1. Crie uma branch: `git checkout -b minha-feature`
+2. Faça commits seguindo Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`)
+3. Envie para o repositório: `git push origin minha-feature`
 4. Abra um Pull Request
-
----
-
-## 📌 Padrão de commits
-
-Seguimos o padrão Conventional Commits:
-
-* feat: nova funcionalidade
-* fix: correção de bug
-* docs: documentação
-* refactor: melhoria de código
-* style: formatação
-* test: testes
-
----
-
-## 📊 Roadmap
-
-* [ ] Cadastro de pedidos
-* [ ] Gestão de entregadores
-* [ ] Geração de rotas
-* [ ] Dashboard analítico
-* [ ] Integração com APIs externas
 
 ---
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT.
+Este projeto está sob a licença MIT — veja [LICENSE](LICENSE).
