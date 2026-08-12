@@ -47,6 +47,18 @@ Projeto Railway "controlog" (ambiente "production")
   do Railway — se o Postgres for recriado, essa referência resolve sozinha, não precisa
   editar nada manualmente.
 
+## CI/CD
+
+- **CI** — a cada `push`/`pull request` para `main`, o workflow
+  [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) roda os testes do backend
+  (Jest) e do frontend (lint + build + Vitest) no GitHub Actions.
+- **CD** — `controlog-backend` e `controlog-frontend` estão conectados ao repositório
+  GitHub (`davigpe/controlog`) como fonte de deploy no Railway, cada um com um
+  **Root Directory** apontando para a sua respectiva pasta e um **Watch Pattern**
+  (`controlog-backend/**` / `controlog-frontend/**`) para que um push só redeploye o
+  serviço cuja pasta mudou. Um `git push` para `main` já é suficiente para publicar —
+  não é mais necessário rodar `railway up` manualmente.
+
 ## Variáveis de ambiente configuradas
 
 **`controlog-backend`**
@@ -98,6 +110,13 @@ railway domain --service controlog-frontend      # gera a URL pública
 
 # Por fim, aponte o CORS do backend para a URL real do frontend
 railway variable set "CORS_ORIGIN=https://<url-do-frontend>" --service controlog-backend
+
+# Conectar cada serviço ao repositório GitHub para deploy automático a cada push
+railway service source connect --repo davigpe/controlog --branch main --service controlog-backend
+railway service source connect --repo davigpe/controlog --branch main --service controlog-frontend
+# Root Directory e Watch Patterns são definidos via API GraphQL (railway api),
+# porque a CLI não expõe esses campos diretamente:
+#   serviceInstanceUpdate(serviceId, environmentId, input: { rootDirectory, watchPatterns })
 ```
 
 ### Popular o banco com dados de exemplo
@@ -118,14 +137,18 @@ railway tcp-proxy delete <proxy-id> --service Postgres --yes
 
 ## Redeploy
 
-Cada `railway up --service <nome>` sobe o diretório atual e faz um novo deploy. Trocar
-uma variável de ambiente (`railway variable set ...`) também dispara um redeploy
-automático do serviço afetado, a menos que `--skip-deploys` seja usado.
+O fluxo normal é `git push` para `main`: o GitHub dispara o deploy automaticamente nos
+serviços conectados (ver seção CI/CD acima). `railway up --service <nome>` continua
+disponível para um deploy manual pontual a partir do diretório atual, mas só deve ser
+usado a partir da raiz do serviço correspondente **sem** que isso conflite com o Root
+Directory configurado — em caso de dúvida, prefira o push. Trocar uma variável de
+ambiente (`railway variable set ...`) também dispara um redeploy automático do serviço
+afetado, a menos que `--skip-deploys` seja usado.
 
 ## Limitações conhecidas
 
-- Sem CI/CD conectado ao GitHub — o deploy é feito manualmente via CLI (`railway up`),
-  não a cada push. Configurar isso é um próximo passo natural (Railway suporta deploy
-  automático conectando o repositório).
 - Sem domínio customizado — usa os subdomínios `*.up.railway.app` gerados pela
   plataforma.
+- O Railway não bloqueia o deploy se o CI falhar (não usamos a opção "Wait for CI") —
+  os testes do GitHub Actions são um sinal para revisão manual antes de mergear em
+  `main`, não um gate automático de deploy.

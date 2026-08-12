@@ -137,8 +137,13 @@ escopo em [`docs/AUDITORIA_ACESSIBILIDADE.md`](docs/AUDITORIA_ACESSIBILIDADE.md)
 O projeto está publicado no **Railway** — frontend, backend e PostgreSQL rodando como
 três serviços no mesmo projeto (não usamos Vercel/Netlify/Firebase/Render, plataformas
 otimizadas só para frontend estático e fora de escopo para este trabalho a partir de
-2026-02). Migrations rodam automaticamente a cada deploy do backend. Detalhes completos,
-variáveis de ambiente e passo a passo para reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+2026-02). Migrations rodam automaticamente a cada deploy do backend.
+
+CI/CD: todo `push`/PR para `main` roda os testes de backend e frontend via GitHub
+Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); cada serviço no
+Railway está conectado ao repositório e faz deploy automático quando sua respectiva
+pasta muda em `main`. Detalhes completos, variáveis de ambiente e passo a passo para
+reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ---
 
