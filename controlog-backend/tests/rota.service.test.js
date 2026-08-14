@@ -10,6 +10,7 @@ function buildPrismaMock() {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
     motorista: { findUnique: jest.fn() },
     veiculo: { findUnique: jest.fn() },
@@ -163,12 +164,14 @@ describe('rota.service', () => {
         veiculo: { id: 'v1', placa: 'ABC-1234', modelo: 'Sprinter' },
       },
     ]);
+    prisma.rota.count.mockResolvedValue(1);
 
     const service = createRotaService(prisma);
     const resultado = await service.list({ busca: 'joinville', status: 'ATIVA' });
 
-    expect(resultado).toHaveLength(1);
-    expect(resultado[0].motorista.nome).toBe('Carlos Silva');
+    expect(resultado.items).toHaveLength(1);
+    expect(resultado.items[0].motorista.nome).toBe('Carlos Silva');
+    expect(resultado.pagination).toEqual({ page: 1, pageSize: 10, total: 1, totalPages: 1 });
   });
 
   test('getById lança NotFoundError quando rota não existe', async () => {

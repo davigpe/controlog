@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, type PaginatedResponse } from '@/lib/api';
 import type { Rota, RotaInput, StatusRota } from './types';
 
 interface ListParams {
   busca?: string;
   status?: StatusRota;
+  page?: number;
+  pageSize?: number;
 }
 
 export function useRotas(params: ListParams = {}) {
   return useQuery({
     queryKey: ['rotas', params],
-    queryFn: async () => (await api.get<Rota[]>('/rotas', { params })).data,
+    queryFn: async () => (await api.get<PaginatedResponse<Rota>>('/rotas', { params })).data,
   });
 }
 

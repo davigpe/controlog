@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { api } from '@/lib/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { paginated } from '@/test/paginated';
 import Motoristas from './index';
 import type { Motorista } from './types';
 
@@ -25,7 +26,7 @@ const carlos: Motorista = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedApi.get.mockResolvedValue({ data: [carlos] });
+  mockedApi.get.mockResolvedValue({ data: paginated([carlos]) });
 });
 
 describe('Motoristas', () => {
@@ -38,7 +39,7 @@ describe('Motoristas', () => {
   });
 
   test('mostra estado vazio quando não há motoristas', async () => {
-    mockedApi.get.mockResolvedValue({ data: [] });
+    mockedApi.get.mockResolvedValue({ data: paginated([]) });
     renderWithProviders(<Motoristas />);
 
     expect(await screen.findByText('Nenhum motorista encontrado para os filtros aplicados.')).toBeInTheDocument();
@@ -92,6 +93,32 @@ describe('Motoristas', () => {
     expect(screen.getAllByText('42').length).toBeGreaterThan(0);
   });
 
+  test('avança de página ao clicar em "Próxima" e reseta a página ao buscar', async () => {
+    const user = userEvent.setup();
+    mockedApi.get.mockResolvedValue({
+      data: { items: [carlos], pagination: { page: 1, pageSize: 10, total: 25, totalPages: 3 } },
+    });
+
+    renderWithProviders(<Motoristas />);
+    await screen.findByText('Carlos Silva');
+
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
+    await waitFor(() =>
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        '/motoristas',
+        expect.objectContaining({ params: expect.objectContaining({ page: 2 }) })
+      )
+    );
+
+    await user.type(screen.getByPlaceholderText('Buscar por nome, CNH ou telefone...'), 'ana');
+    await waitFor(() =>
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        '/motoristas',
+        expect.objectContaining({ params: expect.objectContaining({ page: 1, busca: 'ana' }) })
+      )
+    );
+  });
+
   test('abre o formulário em modo edição ao clicar em editar', async () => {
     const user = userEvent.setup();
     renderWithProviders(<Motoristas />);
@@ -101,5 +128,27 @@ describe('Motoristas', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Editar Motorista' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('Carlos Silva')).toBeInTheDocument();
+  });
+
+  test('edita um motorista existente com sucesso', async () => {
+    const user = userEvent.setup();
+    mockedApi.put.mockResolvedValue({ data: { ...carlos, telefone: '(47) 90000-0000' } });
+
+    renderWithProviders(<Motoristas />);
+    await screen.findByText('Carlos Silva');
+
+    await user.click(screen.getByRole('button', { name: 'Editar Carlos Silva' }));
+    await screen.findByRole('dialog', { name: 'Editar Motorista' });
+
+    const telefoneInput = screen.getByDisplayValue('(47) 99111-1111');
+    await user.clear(telefoneInput);
+    await user.type(telefoneInput, '(47) 90000-0000');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(mockedApi.put).toHaveBeenCalledWith(
+      '/motoristas/m1',
+      expect.objectContaining({ telefone: '(47) 90000-0000' })
+    ));
+    expect(await screen.findByText('Motorista atualizado.')).toBeInTheDocument();
   });
 });

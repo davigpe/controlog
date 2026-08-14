@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { api } from '@/lib/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { paginated } from '@/test/paginated';
 import Veiculos from './index';
 import type { Veiculo } from './types';
 
@@ -24,7 +25,7 @@ const sprinter: Veiculo = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedApi.get.mockResolvedValue({ data: [sprinter] });
+  mockedApi.get.mockResolvedValue({ data: paginated([sprinter]) });
 });
 
 describe('Veiculos', () => {
@@ -38,7 +39,7 @@ describe('Veiculos', () => {
   });
 
   test('mostra estado vazio quando não há veículos', async () => {
-    mockedApi.get.mockResolvedValue({ data: [] });
+    mockedApi.get.mockResolvedValue({ data: paginated([]) });
     renderWithProviders(<Veiculos />);
 
     expect(await screen.findByText('Nenhum veículo encontrado para os filtros aplicados.')).toBeInTheDocument();
@@ -101,5 +102,27 @@ describe('Veiculos', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Editar Veículo' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('ABC-1234')).toBeInTheDocument();
+  });
+
+  test('edita um veículo existente com sucesso', async () => {
+    const user = userEvent.setup();
+    mockedApi.put.mockResolvedValue({ data: { ...sprinter, capacidade: '2.000 kg' } });
+
+    renderWithProviders(<Veiculos />);
+    await screen.findByText('Mercedes Sprinter');
+
+    await user.click(screen.getByRole('button', { name: 'Editar ABC-1234' }));
+    await screen.findByRole('dialog', { name: 'Editar Veículo' });
+
+    const capacidadeInput = screen.getByDisplayValue('1.500 kg');
+    await user.clear(capacidadeInput);
+    await user.type(capacidadeInput, '2.000 kg');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(mockedApi.put).toHaveBeenCalledWith(
+      '/veiculos/v1',
+      expect.objectContaining({ capacidade: '2.000 kg' })
+    ));
+    expect(await screen.findByText('Veículo atualizado.')).toBeInTheDocument();
   });
 });

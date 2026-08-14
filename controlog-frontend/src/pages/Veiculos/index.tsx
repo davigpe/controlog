@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Search, Plus, Eye, Pencil, Trash2, Wrench, CheckCircle, XCircle, Truck } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import Pagination from '@/components/shared/Pagination'
 import { useCreateVeiculo, useDeleteVeiculo, useUpdateVeiculo, useVeiculos } from './api'
 import VeiculoFormModal from './VeiculoFormModal'
 import VeiculoDetalhes from './VeiculoDetalhes'
@@ -35,25 +36,45 @@ const statusIcon: Record<string, React.ReactNode> = {
 export default function Veiculos() {
   const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusVeiculo | 'Todos'>('Todos')
+  const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Veiculo | null>(null)
   const [editando, setEditando]         = useState<Veiculo | null>(null)
   const [formAberto, setFormAberto]     = useState(false)
   const [excluindo, setExcluindo]       = useState<Veiculo | null>(null)
 
-  const { data: veiculos = [], isLoading } = useVeiculos({
+  const { data, isLoading } = useVeiculos({
     busca: search || undefined,
     status: statusFilter === 'Todos' ? undefined : statusFilter,
+    page,
   })
+  const veiculos = data?.items ?? []
   const createMutation = useCreateVeiculo()
   const updateMutation = useUpdateVeiculo()
   const deleteMutation = useDeleteVeiculo()
 
-  const totais = useMemo(() => ({
-    disponiveis: veiculos.filter((v) => v.status === 'DISPONIVEL' && !v.emRota).length,
-    emRota:      veiculos.filter((v) => v.emRota).length,
-    manutencao:  veiculos.filter((v) => v.status === 'MANUTENCAO').length,
-    inativos:    veiculos.filter((v) => v.status === 'INATIVO').length,
-  }), [veiculos])
+  // Ver comentário equivalente em Motoristas/index.tsx — contadores vêm de
+  // pagination.total, não de `veiculos.filter(...)`, que agora é só a página atual.
+  const { data: disponiveisData } = useVeiculos({ status: 'DISPONIVEL', emRota: false, pageSize: 1 })
+  const { data: emRotaData }      = useVeiculos({ emRota: true, pageSize: 1 })
+  const { data: manutencaoData }  = useVeiculos({ status: 'MANUTENCAO', pageSize: 1 })
+  const { data: inativosData }    = useVeiculos({ status: 'INATIVO', pageSize: 1 })
+
+  const totais = {
+    disponiveis: disponiveisData?.pagination.total ?? 0,
+    emRota:      emRotaData?.pagination.total ?? 0,
+    manutencao:  manutencaoData?.pagination.total ?? 0,
+    inativos:    inativosData?.pagination.total ?? 0,
+  }
+
+  function handleBuscaChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleStatusFilterChange(value: StatusVeiculo | 'Todos') {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   function handleSave(data: { placa: string; modelo: string; capacidade: string; status: StatusVeiculo }) {
     const mutation = editando
@@ -90,7 +111,7 @@ export default function Veiculos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Veículos</h1>
-          <p className="text-sm text-gray-600">{veiculos.length} registros encontrados</p>
+          <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} registros encontrados</p>
         </div>
         <button
           onClick={() => { setEditando(null); setFormAberto(true) }}
@@ -117,7 +138,7 @@ export default function Veiculos() {
             type="text"
             placeholder="Buscar por placa ou modelo..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleBuscaChange(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -125,7 +146,7 @@ export default function Veiculos() {
           {(['Todos', ...statusOptions] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => handleStatusFilterChange(s)}
               className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${
                 statusFilter === s
                   ? 'bg-blue-600 text-white border-blue-600'
@@ -204,6 +225,8 @@ export default function Veiculos() {
           })}
         </div>
       )}
+
+      {data && <Pagination pagination={data.pagination} onPageChange={setPage} />}
 
       <VeiculoFormModal
         open={formAberto}

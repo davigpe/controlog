@@ -5,6 +5,7 @@ import { Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/api';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import Pagination from '@/components/shared/Pagination';
 import type { Rota, RotaInput } from './types';
 import RotasTable from './RotasTable';
 import RotaModal from './RotaModal';
@@ -13,15 +14,22 @@ import { useCreateRota, useDeleteRota, useRotas, useUpdateRota } from './api';
 
 export default function RotasPage() {
   const [busca, setBusca] = useState('');
+  const [page, setPage] = useState(1);
   const [modalAberto, setModalAberto] = useState(false);
   const [rotaEditando, setRotaEditando] = useState<Rota | null>(null);
   const [rotaDetalhes, setRotaDetalhes] = useState<Rota | null>(null);
   const [excluindo, setExcluindo] = useState<Rota | null>(null);
 
-  const { data: rotas = [], isLoading } = useRotas({ busca: busca || undefined });
+  const { data, isLoading } = useRotas({ busca: busca || undefined, page });
+  const rotas = data?.items ?? [];
   const createMutation = useCreateRota();
   const updateMutation = useUpdateRota();
   const deleteMutation = useDeleteRota();
+
+  function handleBuscaChange(value: string) {
+    setBusca(value);
+    setPage(1);
+  }
 
   const handleSalvar = (data: RotaInput) => {
     const mutation = rotaEditando
@@ -82,7 +90,7 @@ export default function RotasPage() {
           className="pl-9"
           placeholder="Buscar por código, cidade, motorista..."
           value={busca}
-          onChange={(e) => setBusca(e.target.value)}
+          onChange={(e) => handleBuscaChange(e.target.value)}
         />
       </div>
 
@@ -92,12 +100,15 @@ export default function RotasPage() {
           Carregando rotas...
         </div>
       ) : (
-        <RotasTable
-          rotas={rotas}
-          onVerDetalhes={setRotaDetalhes}
-          onEditar={handleEditar}
-          onExcluir={setExcluindo}
-        />
+        <>
+          <RotasTable
+            rotas={rotas}
+            onVerDetalhes={setRotaDetalhes}
+            onEditar={handleEditar}
+            onExcluir={setExcluindo}
+          />
+          {data && <Pagination pagination={data.pagination} onPageChange={setPage} />}
+        </>
       )}
 
       {/* Modal Criar/Editar */}

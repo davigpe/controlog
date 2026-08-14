@@ -10,6 +10,7 @@ function buildPrismaMock() {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
     rota: { count: jest.fn() },
   };
@@ -75,12 +76,29 @@ describe('veiculo.service', () => {
     prisma.veiculo.findMany.mockResolvedValue([
       { id: 'v1', placa: 'ABC-1234', modelo: 'Sprinter', capacidade: '1.500 kg', status: 'DISPONIVEL', criadoEm: new Date() },
     ]);
+    prisma.veiculo.count.mockResolvedValue(1);
     prisma.rota.count.mockResolvedValue(0);
 
     const service = createVeiculoService(prisma);
     const resultado = await service.list({ busca: 'abc', status: 'DISPONIVEL' });
 
-    expect(resultado).toEqual([expect.objectContaining({ id: 'v1', emRota: false })]);
+    expect(resultado.items).toEqual([expect.objectContaining({ id: 'v1', emRota: false })]);
+    expect(resultado.pagination).toEqual({ page: 1, pageSize: 10, total: 1, totalPages: 1 });
+  });
+
+  test('list filtra por emRota usando a relação rotas', async () => {
+    const prisma = buildPrismaMock();
+    prisma.veiculo.findMany.mockResolvedValue([]);
+    prisma.veiculo.count.mockResolvedValue(0);
+
+    const service = createVeiculoService(prisma);
+    await service.list({ emRota: false });
+
+    expect(prisma.veiculo.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ rotas: { none: { status: 'ATIVA' } } }),
+      })
+    );
   });
 
   test('getById lança NotFoundError quando veículo não existe', async () => {

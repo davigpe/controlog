@@ -3,6 +3,7 @@ import { Search, Filter, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import Pagination from '@/components/shared/Pagination'
 import EntregaDetalhes from './EntregaDetalhes'
 import EntregaFormModal from './EntregaFormModal'
 import { useCreateEntrega, useDeleteEntrega, useEntregas, useUpdateEntrega } from './api'
@@ -28,18 +29,31 @@ const statusLabel: Record<StatusEntrega, string> = {
 export default function Entregas() {
   const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusEntrega | 'Todos'>('Todos')
+  const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Entrega | null>(null)
   const [editando, setEditando]         = useState<Entrega | null>(null)
   const [formAberto, setFormAberto]     = useState(false)
   const [excluindo, setExcluindo]       = useState<Entrega | null>(null)
 
-  const { data: entregas = [], isLoading } = useEntregas({
+  const { data, isLoading } = useEntregas({
     busca: search || undefined,
     status: statusFilter === 'Todos' ? undefined : statusFilter,
+    page,
   })
+  const entregas = data?.items ?? []
   const createMutation = useCreateEntrega()
   const updateMutation = useUpdateEntrega()
   const deleteMutation = useDeleteEntrega()
+
+  function handleBuscaChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleStatusFilterChange(value: StatusEntrega | 'Todos') {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   function handleSave(data: EntregaInput) {
     const mutation = editando
@@ -76,7 +90,7 @@ export default function Entregas() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Entregas</h1>
-          <p className="text-sm text-gray-600">{entregas.length} registros encontrados</p>
+          <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} registros encontrados</p>
         </div>
         <button
           onClick={() => { setEditando(null); setFormAberto(true) }}
@@ -95,7 +109,7 @@ export default function Entregas() {
             type="text"
             placeholder="Buscar por código, destino, motorista ou rota..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleBuscaChange(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -106,7 +120,7 @@ export default function Entregas() {
             {(['Todos', ...statusOptions] as const).map((s) => (
               <button
                 key={s}
-                onClick={() => setStatusFilter(s)}
+                onClick={() => handleStatusFilterChange(s)}
                 className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${
                   statusFilter === s
                     ? 'bg-blue-600 text-white border-blue-600'
@@ -192,6 +206,8 @@ export default function Entregas() {
           </table>
         </div>
       </div>
+
+      {data && <Pagination pagination={data.pagination} onPageChange={setPage} />}
 
       {/* ── Modais ── */}
       <EntregaDetalhes entrega={selected} onClose={() => setSelected(null)} />

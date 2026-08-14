@@ -1,16 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, type PaginatedResponse } from '@/lib/api';
 import type { StatusVeiculo, Veiculo, VeiculoInput } from './types';
 
 interface ListParams {
   busca?: string;
   status?: StatusVeiculo;
+  emRota?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export function useVeiculos(params: ListParams = {}) {
   return useQuery({
     queryKey: ['veiculos', params],
-    queryFn: async () => (await api.get<Veiculo[]>('/veiculos', { params })).data,
+    queryFn: async () => (await api.get<PaginatedResponse<Veiculo>>('/veiculos', { params })).data,
   });
 }
 

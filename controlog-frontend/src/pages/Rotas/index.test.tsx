@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { api } from '@/lib/api';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { paginated } from '@/test/paginated';
 import RotasPage from './index';
 import type { Rota } from './types';
 
@@ -22,20 +23,20 @@ const rotaAtiva: Rota = {
   criadoEm: new Date().toISOString(),
   coordenadasOrigem: [-26.3045, -48.8487],
   coordenadasDestino: [-27.5954, -48.548],
-  motorista: { id: 'm1', nome: 'Carlos Silva' },
-  veiculo: { id: 'v1', placa: 'ABC-1234', modelo: 'Mercedes Sprinter' },
+  motorista: { id: '11111111-1111-4111-8111-111111111111', nome: 'Carlos Silva' },
+  veiculo: { id: '22222222-2222-4222-8222-222222222222', placa: 'ABC-1234', modelo: 'Mercedes Sprinter' },
 };
 
-const motoristas = [{ id: 'm1', nome: 'Carlos Silva', cnh: '1', telefone: '1', status: 'ATIVO', emRota: true, entregasRealizadas: 0, criadoEm: '' }];
-const veiculos = [{ id: 'v1', placa: 'ABC-1234', modelo: 'Mercedes Sprinter', capacidade: '1.500 kg', status: 'DISPONIVEL', emRota: true, criadoEm: '' }];
+const motoristas = [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Carlos Silva', cnh: '1', telefone: '1', status: 'ATIVO', emRota: true, entregasRealizadas: 0, criadoEm: '' }];
+const veiculos = [{ id: '22222222-2222-4222-8222-222222222222', placa: 'ABC-1234', modelo: 'Mercedes Sprinter', capacidade: '1.500 kg', status: 'DISPONIVEL', emRota: true, criadoEm: '' }];
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedApi.get.mockImplementation((url: string) => {
-    if (url === '/rotas') return Promise.resolve({ data: [rotaAtiva] });
-    if (url === '/motoristas') return Promise.resolve({ data: motoristas });
-    if (url === '/veiculos') return Promise.resolve({ data: veiculos });
-    return Promise.resolve({ data: [] });
+    if (url === '/rotas') return Promise.resolve({ data: paginated([rotaAtiva]) });
+    if (url === '/motoristas') return Promise.resolve({ data: paginated(motoristas) });
+    if (url === '/veiculos') return Promise.resolve({ data: paginated(veiculos) });
+    return Promise.resolve({ data: paginated([]) });
   });
 });
 
@@ -92,5 +93,51 @@ describe('Rotas', () => {
 
     expect(await screen.findByText('Rota excluída.')).toBeInTheDocument();
     expect(mockedApi.delete).toHaveBeenCalledWith('/rotas/r1');
+  });
+
+  test('edita uma rota existente com sucesso', async () => {
+    const user = userEvent.setup();
+    mockedApi.put.mockResolvedValue({ data: { ...rotaAtiva, codigo: 'RT-002' } });
+
+    renderWithProviders(<RotasPage />);
+    await screen.findByText('RT-001');
+
+    await user.click(screen.getByRole('button', { name: 'Editar RT-001' }));
+    await screen.findByRole('dialog', { name: 'Editar Rota' });
+
+    const codigoInput = screen.getByDisplayValue('RT-001');
+    await user.clear(codigoInput);
+    await user.type(codigoInput, 'RT-002');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => expect(mockedApi.put).toHaveBeenCalledWith(
+      '/rotas/r1',
+      expect.objectContaining({ codigo: 'RT-002' })
+    ));
+    expect(await screen.findByText('Rota atualizada.')).toBeInTheDocument();
+  });
+
+  test('avança de página ao clicar em "Próxima"', async () => {
+    const user = userEvent.setup();
+    mockedApi.get.mockImplementation((url: string) => {
+      if (url === '/rotas') {
+        return Promise.resolve({
+          data: { items: [rotaAtiva], pagination: { page: 1, pageSize: 10, total: 25, totalPages: 3 } },
+        });
+      }
+      if (url === '/motoristas') return Promise.resolve({ data: paginated(motoristas) });
+      if (url === '/veiculos') return Promise.resolve({ data: paginated(veiculos) });
+      return Promise.resolve({ data: paginated([]) });
+    });
+
+    renderWithProviders(<RotasPage />);
+    await screen.findByText('RT-001');
+
+    await user.click(screen.getByRole('button', { name: 'Próxima página' }));
+
+    await waitFor(() => expect(mockedApi.get).toHaveBeenCalledWith(
+      '/rotas',
+      expect.objectContaining({ params: expect.objectContaining({ page: 2 }) })
+    ));
   });
 });

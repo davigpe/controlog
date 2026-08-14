@@ -10,6 +10,7 @@ function buildPrismaMock() {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
     rota: { count: jest.fn() },
     entrega: { count: jest.fn() },
@@ -77,6 +78,7 @@ describe('motorista.service', () => {
     prisma.motorista.findMany.mockResolvedValue([
       { id: 'm1', nome: 'Carlos Silva', cnh: '1', telefone: '1', status: 'ATIVO', criadoEm: new Date() },
     ]);
+    prisma.motorista.count.mockResolvedValue(1);
     prisma.rota.count.mockResolvedValue(1);
     prisma.entrega.count.mockResolvedValue(3);
 
@@ -86,9 +88,39 @@ describe('motorista.service', () => {
     expect(prisma.motorista.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ status: 'ATIVO' }) })
     );
-    expect(resultado).toEqual([
+    expect(resultado.items).toEqual([
       expect.objectContaining({ id: 'm1', emRota: true, entregasRealizadas: 3 }),
     ]);
+    expect(resultado.pagination).toEqual({ page: 1, pageSize: 10, total: 1, totalPages: 1 });
+  });
+
+  test('list filtra por emRota usando a relação rotas', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findMany.mockResolvedValue([]);
+    prisma.motorista.count.mockResolvedValue(0);
+
+    const service = createMotoristaService(prisma);
+    await service.list({ emRota: true });
+
+    expect(prisma.motorista.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ rotas: { some: { status: 'ATIVA' } } }),
+      })
+    );
+  });
+
+  test('list pagina com page e pageSize informados', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findMany.mockResolvedValue([]);
+    prisma.motorista.count.mockResolvedValue(25);
+
+    const service = createMotoristaService(prisma);
+    const resultado = await service.list({ page: 2, pageSize: 10 });
+
+    expect(prisma.motorista.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 10, take: 10 })
+    );
+    expect(resultado.pagination).toEqual({ page: 2, pageSize: 10, total: 25, totalPages: 3 });
   });
 
   test('getById lança NotFoundError quando motorista não existe', async () => {

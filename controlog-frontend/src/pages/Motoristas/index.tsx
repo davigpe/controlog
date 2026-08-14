@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Search, Plus, Eye, Pencil, Trash2, Truck, CheckCircle, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import Pagination from '@/components/shared/Pagination'
 import { useCreateMotorista, useDeleteMotorista, useMotoristas, useUpdateMotorista } from './api'
 import MotoristaFormModal from './MotoristaFormModal'
 import MotoristaDetalhes from './MotoristaDetalhes'
@@ -26,24 +27,44 @@ const statusIcon: Record<string, React.ReactNode> = {
 export default function Motoristas() {
   const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusMotorista | 'Todos'>('Todos')
+  const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Motorista | null>(null)
   const [editando, setEditando]         = useState<Motorista | null>(null)
   const [formAberto, setFormAberto]     = useState(false)
   const [excluindo, setExcluindo]       = useState<Motorista | null>(null)
 
-  const { data: motoristas = [], isLoading } = useMotoristas({
+  const { data, isLoading } = useMotoristas({
     busca: search || undefined,
     status: statusFilter === 'Todos' ? undefined : statusFilter,
+    page,
   })
+  const motoristas = data?.items ?? []
   const createMutation = useCreateMotorista()
   const updateMutation = useUpdateMotorista()
   const deleteMutation = useDeleteMotorista()
 
-  const totais = useMemo(() => ({
-    ativos:   motoristas.filter((m) => m.status === 'ATIVO' && !m.emRota).length,
-    emRota:   motoristas.filter((m) => m.emRota).length,
-    inativos: motoristas.filter((m) => m.status === 'INATIVO').length,
-  }), [motoristas])
+  // Contadores dos cards de resumo vêm de consultas próprias (só pagination.total,
+  // pageSize: 1) em vez de contar sobre `motoristas`, porque esse array agora é só
+  // a página atual — contar localmente subestimaria o total após paginar.
+  const { data: ativosData }   = useMotoristas({ status: 'ATIVO', emRota: false, pageSize: 1 })
+  const { data: emRotaData }   = useMotoristas({ emRota: true, pageSize: 1 })
+  const { data: inativosData } = useMotoristas({ status: 'INATIVO', pageSize: 1 })
+
+  const totais = {
+    ativos:   ativosData?.pagination.total ?? 0,
+    emRota:   emRotaData?.pagination.total ?? 0,
+    inativos: inativosData?.pagination.total ?? 0,
+  }
+
+  function handleBuscaChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
+  function handleStatusFilterChange(value: StatusMotorista | 'Todos') {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   function handleSave(data: { nome: string; cnh: string; telefone: string; status: StatusMotorista }) {
     const mutation = editando
@@ -80,7 +101,7 @@ export default function Motoristas() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Motoristas</h1>
-          <p className="text-sm text-gray-600">{motoristas.length} registros encontrados</p>
+          <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} registros encontrados</p>
         </div>
         <button
           onClick={() => { setEditando(null); setFormAberto(true) }}
@@ -106,7 +127,7 @@ export default function Motoristas() {
             type="text"
             placeholder="Buscar por nome, CNH ou telefone..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleBuscaChange(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
@@ -115,7 +136,7 @@ export default function Motoristas() {
           {(['Todos', ...statusOptions] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => handleStatusFilterChange(s)}
               className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors border ${
                 statusFilter === s
                   ? 'bg-blue-600 text-white border-blue-600'
@@ -190,6 +211,8 @@ export default function Motoristas() {
           })}
         </div>
       )}
+
+      {data && <Pagination pagination={data.pagination} onPageChange={setPage} />}
 
       <MotoristaFormModal
         open={formAberto}

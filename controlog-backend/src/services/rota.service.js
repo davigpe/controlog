@@ -1,4 +1,5 @@
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 
 const include = {
   motorista: { select: { id: true, nome: true } },
@@ -25,26 +26,33 @@ const REATIVAVEL_APENAS_POR_GESTOR = new Set(['CONCLUIDA', 'CANCELADA']);
 
 export function createRotaService(prisma) {
   return {
-    async list({ busca, status } = {}) {
-      const rotas = await prisma.rota.findMany({
-        where: {
-          status: status ?? undefined,
-          ...(busca
-            ? {
-                OR: [
-                  { codigo: { contains: busca, mode: 'insensitive' } },
-                  { origem: { contains: busca, mode: 'insensitive' } },
-                  { destino: { contains: busca, mode: 'insensitive' } },
-                  { motorista: { nome: { contains: busca, mode: 'insensitive' } } },
-                  { veiculo: { placa: { contains: busca, mode: 'insensitive' } } },
-                ],
-              }
-            : {}),
-        },
-        include,
-        orderBy: { dataHora: 'desc' },
-      });
-      return rotas.map(toResponse);
+    async list({ busca, status, page = 1, pageSize = 10 } = {}) {
+      const where = {
+        status: status ?? undefined,
+        ...(busca
+          ? {
+              OR: [
+                { codigo: { contains: busca, mode: 'insensitive' } },
+                { origem: { contains: busca, mode: 'insensitive' } },
+                { destino: { contains: busca, mode: 'insensitive' } },
+                { motorista: { nome: { contains: busca, mode: 'insensitive' } } },
+                { veiculo: { placa: { contains: busca, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      };
+
+      const [rotas, total] = await Promise.all([
+        prisma.rota.findMany({
+          where,
+          include,
+          orderBy: { dataHora: 'desc' },
+          ...paginationArgs({ page, pageSize }),
+        }),
+        prisma.rota.count({ where }),
+      ]);
+
+      return { items: rotas.map(toResponse), pagination: paginationMeta({ page, pageSize, total }) };
     },
 
     async getById(id) {

@@ -1,4 +1,5 @@
 import { ConflictError, NotFoundError } from '../utils/AppError.js';
+import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 
 function toResponse(motorista, extras = {}) {
   return {
@@ -14,24 +15,28 @@ function toResponse(motorista, extras = {}) {
 
 export function createMotoristaService(prisma) {
   return {
-    async list({ busca, status } = {}) {
-      const motoristas = await prisma.motorista.findMany({
-        where: {
-          status: status ?? undefined,
-          ...(busca
-            ? {
-                OR: [
-                  { nome: { contains: busca, mode: 'insensitive' } },
-                  { cnh: { contains: busca, mode: 'insensitive' } },
-                  { telefone: { contains: busca, mode: 'insensitive' } },
-                ],
-              }
-            : {}),
-        },
-        orderBy: { nome: 'asc' },
-      });
+    async list({ busca, status, emRota, page = 1, pageSize = 10 } = {}) {
+      const where = {
+        status: status ?? undefined,
+        ...(emRota === true ? { rotas: { some: { status: 'ATIVA' } } } : {}),
+        ...(emRota === false ? { rotas: { none: { status: 'ATIVA' } } } : {}),
+        ...(busca
+          ? {
+              OR: [
+                { nome: { contains: busca, mode: 'insensitive' } },
+                { cnh: { contains: busca, mode: 'insensitive' } },
+                { telefone: { contains: busca, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      };
 
-      return Promise.all(
+      const [motoristas, total] = await Promise.all([
+        prisma.motorista.findMany({ where, orderBy: { nome: 'asc' }, ...paginationArgs({ page, pageSize }) }),
+        prisma.motorista.count({ where }),
+      ]);
+
+      const items = await Promise.all(
         motoristas.map(async (motorista) => {
           const [rotasAtivas, entregasRealizadas] = await Promise.all([
             prisma.rota.count({ where: { motoristaId: motorista.id, status: 'ATIVA' } }),
@@ -40,6 +45,8 @@ export function createMotoristaService(prisma) {
           return toResponse(motorista, { emRota: rotasAtivas > 0, entregasRealizadas });
         })
       );
+
+      return { items, pagination: paginationMeta({ page, pageSize, total }) };
     },
 
     async getById(id) {

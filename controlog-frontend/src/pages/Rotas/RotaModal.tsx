@@ -36,8 +36,10 @@ interface Props {
 }
 
 export default function RotaModal({ open, onClose, onSave, rotaEditando, saving }: Props) {
-  const { data: motoristas = [] } = useMotoristas();
-  const { data: veiculos = [] } = useVeiculos();
+  const { data: motoristasData } = useMotoristas({ pageSize: 100 });
+  const { data: veiculosData } = useVeiculos({ pageSize: 100 });
+  const motoristas = motoristasData?.items ?? [];
+  const veiculos = veiculosData?.items ?? [];
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),

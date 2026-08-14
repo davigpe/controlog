@@ -17,4 +17,6 @@ export const listEntregasQuerySchema = z.object({
   busca: z.string().trim().optional(),
   status: z.enum(['PENDENTE', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA']).optional(),
   rotaId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
 });

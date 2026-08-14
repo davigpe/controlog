@@ -22,4 +22,6 @@ export const updateRotaSchema = createRotaSchema.partial();
 export const listRotasQuerySchema = z.object({
   busca: z.string().trim().optional(),
   status: z.enum(['ATIVA', 'CONCLUIDA', 'CANCELADA']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
 });

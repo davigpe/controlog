@@ -27,8 +27,10 @@ interface Props {
 }
 
 export default function EntregaFormModal({ open, entregaEditando, onClose, onSave, saving }: Props) {
-  const { data: rotas = [] } = useRotas();
-  const { data: motoristas = [] } = useMotoristas();
+  const { data: rotasData } = useRotas({ pageSize: 100 });
+  const { data: motoristasData } = useMotoristas({ pageSize: 100 });
+  const rotas = rotasData?.items ?? [];
+  const motoristas = motoristasData?.items ?? [];
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>();
 

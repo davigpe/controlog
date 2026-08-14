@@ -12,4 +12,7 @@ export const updateVeiculoSchema = createVeiculoSchema.partial();
 export const listVeiculosQuerySchema = z.object({
   busca: z.string().trim().optional(),
   status: z.enum(['DISPONIVEL', 'MANUTENCAO', 'INATIVO']).optional(),
+  emRota: z.coerce.boolean().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
 });

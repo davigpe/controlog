@@ -10,6 +10,7 @@ function buildPrismaMock() {
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      count: jest.fn(),
     },
     rota: { findUnique: jest.fn() },
     motorista: { findUnique: jest.fn() },
@@ -93,11 +94,13 @@ describe('entrega.service', () => {
         motorista: { id: 'm1', nome: 'Carlos Silva' },
       },
     ]);
+    prisma.entrega.count.mockResolvedValue(1);
 
     const service = createEntregaService(prisma);
     const resultado = await service.list({ busca: 'floripa', status: 'PENDENTE', rotaId: 'r1' });
 
-    expect(resultado).toHaveLength(1);
+    expect(resultado.items).toHaveLength(1);
+    expect(resultado.pagination).toEqual({ page: 1, pageSize: 10, total: 1, totalPages: 1 });
   });
 
   test('getById lança NotFoundError quando entrega não existe', async () => {

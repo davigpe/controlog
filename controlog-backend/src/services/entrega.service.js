@@ -1,4 +1,5 @@
 import { ConflictError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 
 const include = {
   rota: { select: { id: true, codigo: true } },
@@ -21,26 +22,33 @@ function toResponse(entrega) {
 
 export function createEntregaService(prisma) {
   return {
-    async list({ busca, status, rotaId } = {}) {
-      const entregas = await prisma.entrega.findMany({
-        where: {
-          status: status ?? undefined,
-          rotaId: rotaId ?? undefined,
-          ...(busca
-            ? {
-                OR: [
-                  { codigo: { contains: busca, mode: 'insensitive' } },
-                  { destino: { contains: busca, mode: 'insensitive' } },
-                  { motorista: { nome: { contains: busca, mode: 'insensitive' } } },
-                  { rota: { codigo: { contains: busca, mode: 'insensitive' } } },
-                ],
-              }
-            : {}),
-        },
-        include,
-        orderBy: { dataPrevista: 'desc' },
-      });
-      return entregas.map(toResponse);
+    async list({ busca, status, rotaId, page = 1, pageSize = 10 } = {}) {
+      const where = {
+        status: status ?? undefined,
+        rotaId: rotaId ?? undefined,
+        ...(busca
+          ? {
+              OR: [
+                { codigo: { contains: busca, mode: 'insensitive' } },
+                { destino: { contains: busca, mode: 'insensitive' } },
+                { motorista: { nome: { contains: busca, mode: 'insensitive' } } },
+                { rota: { codigo: { contains: busca, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      };
+
+      const [entregas, total] = await Promise.all([
+        prisma.entrega.findMany({
+          where,
+          include,
+          orderBy: { dataPrevista: 'desc' },
+          ...paginationArgs({ page, pageSize }),
+        }),
+        prisma.entrega.count({ where }),
+      ]);
+
+      return { items: entregas.map(toResponse), pagination: paginationMeta({ page, pageSize, total }) };
     },
 
     async getById(id) {

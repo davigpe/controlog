@@ -39,6 +39,18 @@ api.interceptors.response.use(
   }
 );
 
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}
+
 export function getErrorMessage(error: unknown, fallback = 'Ocorreu um erro inesperado.'): string {
   if (axios.isAxiosError(error)) {
     return (error.response?.data as { message?: string } | undefined)?.message ?? fallback;
