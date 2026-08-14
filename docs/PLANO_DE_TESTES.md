@@ -41,6 +41,22 @@ O autocadastro público (`POST /api/auth/register`) sempre cria um usuário `OPE
 elevar alguém a `GESTOR` é uma ação administrativa feita diretamente no banco (ou via
 seed), evitando escalonamento de privilégio pela própria API pública.
 
+**Redefinição de senha.** `POST /api/auth/esqueci-senha` (`{ email }`) sempre responde
+`200` com uma mensagem genérica, exista ou não o e-mail — evita que o endpoint seja usado
+para descobrir quais e-mails estão cadastrados. Quando o e-mail existe, um token aleatório
+de 32 bytes é gerado, seu hash SHA-256 é gravado em `usuarios.reset_token_hash` com
+expiração de 1h, e o link (`<frontend>/redefinir-senha?token=...`) é registrado no log do
+servidor — não há provedor de e-mail transacional configurado neste projeto (não é um
+domínio de produção real), então o log substitui o envio, e essa é uma limitação conhecida
+documentada em `docs/DEPLOY.md`. `POST /api/auth/redefinir-senha` (`{ token, novaSenha }`)
+valida o hash e a expiração antes de trocar a senha e invalidar o token.
+
+**Rate limiting em rotas sensíveis.** Além do limite global (RNF04, 300 req/min por IP em
+`/api`), `POST /api/auth/login`, `/auth/esqueci-senha` e `/auth/redefinir-senha` têm um
+limite dedicado — 10 tentativas a cada 15 minutos, chaveado por IP + e-mail informado —
+para dificultar força bruta de senha e enumeração de e-mail sem bloquear todos os usuários
+de uma mesma rede por causa de uma única tentativa.
+
 ## 2. Estratégia de testes
 
 | Camada | Ferramenta | O que cobre |
@@ -56,9 +72,9 @@ seed), evitando escalonamento de privilégio pela própria API pública.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 79 testes em 13 suítes — **94,3% statements**, **95% funções**, **71,3% branches**.
+- **Backend:** 90 testes em 13 suítes — **94,7% statements**, **95,3% funções**, **74,6% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 77 testes em 18 suítes — **78,6% statements**, **70,2% funções**, **78,4% branches**.
+- **Frontend:** 102 testes em 21 suítes — **85% statements**, **77,5% funções**, **86,7% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -87,6 +103,21 @@ Playwright de ponta a ponta (seção 5) do que em testes unitários de component
 | RF11/RN07 | Cadastrar entrega sem rota ou motorista válido | Erro `ValidationError` (422) | `tests/entrega.service.test.js` |
 | RF13/RF14 | Consultar relatório filtrado por período (`dataInicio`/`dataFim`) | Retorna rotas/entregas por status e motoristas mais ativos apenas dentro do intervalo | `tests/relatorio.service.test.js` |
 
+### 3.1 Itens adicionais implementados além do RFC
+
+Não fazem parte da lista de RFs originais do RFC, mas foram adicionados depois por boas
+práticas de segurança/escalabilidade:
+
+| ID | Caso de teste | Resultado esperado | Cobertura |
+|---|---|---|---|
+| Paginação | Listar motoristas/veículos/rotas/entregas com `page`/`pageSize` | Retorna `{ items, pagination: { page, pageSize, total, totalPages } }`, aplicando `skip`/`take` no Prisma | `tests/motorista.service.test.js`, `tests/veiculo.service.test.js`, `tests/rota.service.test.js`, `tests/entrega.service.test.js` |
+| Paginação | Filtrar motoristas/veículos por `emRota` (true/false) | Usa a relação `rotas` (`some`/`none` com `status: ATIVA`) no `where` do Prisma | `tests/motorista.service.test.js`, `tests/veiculo.service.test.js` |
+| Reset de senha | Solicitar reset para e-mail cadastrado | Gera token, grava o hash SHA-256 e a expiração (1h), registra o link no log | `tests/auth.service.test.js` |
+| Reset de senha | Solicitar reset para e-mail inexistente | Não lança erro nem grava nada (evita enumeração de usuários) | `tests/auth.service.test.js` |
+| Reset de senha | Redefinir senha com token válido e não expirado | Senha atualizada, token invalidado (`resetTokenHash`/`resetTokenExpiraEm` voltam a `null`) | `tests/auth.service.test.js` |
+| Reset de senha | Redefinir senha com token inexistente ou expirado | `422 ValidationError` — "Token de redefinição inválido ou expirado." | `tests/auth.service.test.js` |
+| Rate limit | Mais de 10 tentativas de login em 15 minutos (mesmo IP + e-mail) | `429 Too Many Requests` | Verificado manualmente (o `express-rate-limit` não é mockável de forma prática em teste unitário) |
+
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
 | Regra | Caso de teste | Resultado esperado | Cobertura |
@@ -108,6 +139,10 @@ Playwright de ponta a ponta (seção 5) do que em testes unitários de component
 | Autenticação | Login com sucesso armazena usuário/tokens e navega para a área protegida | `src/pages/Login/index.test.tsx` |
 | Autenticação | Login com credenciais inválidas mostra erro e não navega | `src/pages/Login/index.test.tsx` |
 | Autenticação | Refresh troca o access token; se o refresh token for inválido, faz logout | `src/stores/authStore.test.ts` |
+| Reset de senha | Solicitar link de redefinição mostra mensagem genérica de sucesso | `src/pages/EsqueciSenha/index.test.tsx` |
+| Reset de senha | Redefinir senha com token válido navega para o login; token inválido mostra erro da API | `src/pages/RedefinirSenha/index.test.tsx`, `src/stores/authStore.test.ts` |
+| Paginação | Avançar de página chama a API com `page` atualizado; alterar busca/filtro reseta para a página 1 | `src/pages/Motoristas/index.test.tsx`, `src/pages/Rotas/index.test.tsx`, `src/pages/Entregas/index.test.tsx` |
+| Paginação | Componente `Pagination` desabilita "Anterior"/"Próxima" nos limites e não renderiza com 1 página só | `src/components/shared/Pagination.test.tsx` |
 | RN01 | Rota protegida redireciona para `/login` sem sessão; renderiza com sessão ativa | `src/components/auth/RequireAuth.test.tsx`, `src/App.test.tsx` |
 | RN03 | Excluir motorista com rota ativa mostra a mensagem de erro do backend | `src/pages/Motoristas/index.test.tsx` |
 | RN04 | Excluir veículo com rota ativa mostra a mensagem de erro do backend | `src/pages/Veiculos/index.test.tsx` |

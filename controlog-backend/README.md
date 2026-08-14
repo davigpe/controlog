@@ -79,7 +79,7 @@ A API sobe em `http://localhost:3333`. Health check: `GET /health`.
 
 ## Testes
 
-Os testes unitários injetam um Prisma Client mockado diretamente nos services (todos os services são fábricas `create*Service(prisma)`), então **não é necessário ter o banco rodando** para executar `npm test`. Cobertura atual: acima de 90% de statements/lines (meta do RFC, RNF07, é ≥70%).
+Os testes unitários injetam um Prisma Client mockado diretamente nos services (todos os services são fábricas `create*Service(prisma)`), então **não é necessário ter o banco rodando** para executar `npm test`. Cobertura atual: 90 testes, acima de 90% de statements/lines (meta do RFC, RNF07, é ≥70%).
 
 ## Autenticação
 
@@ -87,8 +87,15 @@ Os testes unitários injetam um Prisma Client mockado diretamente nos services (
 - `POST /api/auth/login` — retorna `accessToken` (expira em 1h) e `refreshToken` (expira em 7 dias).
 - `POST /api/auth/refresh` — troca um refresh token válido por um novo access token.
 - `GET /api/auth/me` — dados do usuário autenticado.
+- `POST /api/auth/esqueci-senha` — `{ email }`. Sempre responde 200 com mensagem genérica
+  (não revela se o e-mail existe). Não há provedor de e-mail configurado neste projeto —
+  o link de redefinição é registrado no log do servidor em vez de enviado por e-mail.
+- `POST /api/auth/redefinir-senha` — `{ token, novaSenha }`. Token expira em 1h.
 
 Todas as demais rotas sob `/api` exigem o header `Authorization: Bearer <accessToken>` (RN01).
+
+`/auth/login`, `/auth/esqueci-senha` e `/auth/redefinir-senha` têm um rate limit dedicado
+(10 tentativas/15min por IP + e-mail), além do limite global da API.
 
 Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GESTOR` é feito diretamente no banco (ou via seed) — não existe elevação de privilégio pelo endpoint público de cadastro.
 
@@ -102,6 +109,11 @@ Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GES
 | Entregas | `GET/POST /api/entregas`, `GET/PUT/DELETE /api/entregas/:id` |
 | Dashboard | `GET /api/dashboard/resumo` |
 | Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...` |
+
+Os endpoints de listagem (`GET /api/motoristas`, `/veiculos`, `/rotas`, `/entregas`) aceitam
+paginação via `?page=1&pageSize=10` (`pageSize` máximo 100) e retornam
+`{ items, pagination: { page, pageSize, total, totalPages } }`. Motoristas e veículos também
+aceitam `?emRota=true|false` para filtrar por quem tem rota `ATIVA` vinculada no momento.
 
 ## Regras de negócio implementadas (RFC, seção 2.5)
 
