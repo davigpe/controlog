@@ -59,6 +59,41 @@ describe('auth.controller', () => {
     expect(service.refresh).toHaveBeenCalledWith('abc');
     expect(res.json).toHaveBeenCalledWith({ accessToken: 'novo-token' });
   });
+
+  test('forgotPassword sempre responde 200 com mensagem genérica', async () => {
+    const service = { solicitarResetSenha: jest.fn().mockResolvedValue(undefined) };
+    const controller = createAuthController(service);
+    const res = buildRes();
+
+    await controller.forgotPassword({ body: { email: 'juliana@controlog.com' } }, res, jest.fn());
+
+    expect(service.solicitarResetSenha).toHaveBeenCalledWith('juliana@controlog.com');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
+  });
+
+  test('resetPassword responde 200 quando o service redefine a senha', async () => {
+    const service = { redefinirSenha: jest.fn().mockResolvedValue(undefined) };
+    const controller = createAuthController(service);
+    const req = { body: { token: 'abc', novaSenha: 'novaSenhaSegura123' } };
+    const res = buildRes();
+
+    await controller.resetPassword(req, res, jest.fn());
+
+    expect(service.redefinirSenha).toHaveBeenCalledWith(req.body);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('resetPassword encaminha erro do service para next()', async () => {
+    const erro = new Error('token inválido');
+    const service = { redefinirSenha: jest.fn().mockRejectedValue(erro) };
+    const controller = createAuthController(service);
+    const next = jest.fn();
+
+    await controller.resetPassword({ body: { token: 'x', novaSenha: 'novaSenhaSegura123' } }, buildRes(), next);
+
+    expect(next).toHaveBeenCalledWith(erro);
+  });
 });
 
 describe('motorista.controller', () => {

@@ -17,6 +17,8 @@ interface AuthState {
   register: (nome: string, email: string, senha: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<string | null>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (token: string, novaSenha: string) => Promise<void>;
 }
 
 const baseURL = import.meta.env.VITE_API_URL;
@@ -53,6 +55,14 @@ export const useAuthStore = create<AuthState>()(
           get().logout();
           return null;
         }
+      },
+
+      async forgotPassword(email) {
+        await axios.post(`${baseURL}/auth/esqueci-senha`, { email });
+      },
+
+      async resetPassword(token, novaSenha) {
+        await axios.post(`${baseURL}/auth/redefinir-senha`, { token, novaSenha });
       },
     }),
     {

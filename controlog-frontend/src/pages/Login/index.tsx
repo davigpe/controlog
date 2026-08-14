@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -73,7 +73,12 @@ export default function Login() {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="senha">Senha</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="senha">Senha</Label>
+              <Link to="/esqueci-senha" className="text-xs font-medium text-blue-600 hover:underline">
+                Esqueci minha senha
+              </Link>
+            </div>
             <Input
               id="senha"
               type="password"

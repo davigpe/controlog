@@ -21,5 +21,17 @@ export function createAuthController(authService) {
       const usuario = await authService.me(req.user.id);
       res.status(200).json(usuario);
     }),
+
+    forgotPassword: asyncHandler(async (req, res) => {
+      await authService.solicitarResetSenha(req.body.email);
+      res.status(200).json({
+        message: 'Se este e-mail estiver cadastrado, enviaremos um link de redefinição.',
+      });
+    }),
+
+    resetPassword: asyncHandler(async (req, res) => {
+      await authService.redefinirSenha(req.body);
+      res.status(200).json({ message: 'Senha redefinida com sucesso.' });
+    }),
   };
 }

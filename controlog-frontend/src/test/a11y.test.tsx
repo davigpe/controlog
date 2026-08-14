@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { api } from '@/lib/api';
 import { axe } from './axeHelper';
 import { renderWithProviders } from './renderWithProviders';
+import { paginated } from './paginated';
 import Login from '@/pages/Login';
+import EsqueciSenha from '@/pages/EsqueciSenha';
+import RedefinirSenha from '@/pages/RedefinirSenha';
 import Dashboard from '@/pages/Dashboard';
 import Motoristas from '@/pages/Motoristas';
 import Veiculos from '@/pages/Veiculos';
@@ -19,7 +22,7 @@ const mockedApi = vi.mocked(api, true);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedApi.get.mockResolvedValue({ data: [] });
+  mockedApi.get.mockResolvedValue({ data: paginated([]) });
 });
 
 // Guarda de regressão: sem erros estruturais de acessibilidade (nome acessível de
@@ -28,6 +31,23 @@ beforeEach(() => {
 describe('acessibilidade (regressão estrutural)', () => {
   test('Login não tem violações de acessibilidade', async () => {
     const { container } = renderWithProviders(<Login />, { route: '/login' });
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Esqueci minha senha não tem violações de acessibilidade', async () => {
+    const { container } = renderWithProviders(<EsqueciSenha />, { route: '/esqueci-senha' });
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Redefinir senha (com token) não tem violações de acessibilidade', async () => {
+    const { container } = renderWithProviders(<RedefinirSenha />, {
+      route: '/redefinir-senha?token=abc123',
+    });
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Redefinir senha (sem token) não tem violações de acessibilidade', async () => {
+    const { container } = renderWithProviders(<RedefinirSenha />, { route: '/redefinir-senha' });
     await expect(axe(container)).resolves.toHaveNoViolations();
   });
 

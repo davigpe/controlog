@@ -41,12 +41,14 @@ enum EntregaStatus {
 }
 
 model Usuario {
-  id        String        @id @default(uuid())
-  nome      String
-  email     String        @unique
-  senhaHash String        @map("senha_hash")
-  perfil    UsuarioPerfil @default(OPERADOR)
-  criadoEm  DateTime      @default(now()) @map("criado_em")
+  id                  String        @id @default(uuid())
+  nome                String
+  email               String        @unique
+  senhaHash           String        @map("senha_hash")
+  perfil              UsuarioPerfil @default(OPERADOR)
+  resetTokenHash      String?       @map("reset_token_hash")
+  resetTokenExpiraEm  DateTime?     @map("reset_token_expira_em")
+  criadoEm            DateTime      @default(now()) @map("criado_em")
 
   @@map("usuarios")
 }

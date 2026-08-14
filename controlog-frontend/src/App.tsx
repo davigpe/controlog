@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/layout'
 import RequireAuth from './components/auth/RequireAuth'
-import Login       from './pages/Login'
+import Login          from './pages/Login'
+import EsqueciSenha   from './pages/EsqueciSenha'
+import RedefinirSenha from './pages/RedefinirSenha'
 import Dashboard   from './pages/Dashboard'
 import Entregas    from './pages/Entregas'
 import Veiculos    from './pages/Veiculos'
@@ -14,6 +16,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/esqueci-senha" element={<EsqueciSenha />} />
+        <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Layout />}>

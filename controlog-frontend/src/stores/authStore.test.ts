@@ -86,4 +86,35 @@ describe('authStore', () => {
     expect(useAuthStore.getState().usuario).toBeNull();
     expect(useAuthStore.getState().accessToken).toBeNull();
   });
+
+  test('forgotPassword chama o endpoint de esqueci-senha com o e-mail informado', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { message: 'ok' } });
+
+    await useAuthStore.getState().forgotPassword('gestor@controlog.com');
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/esqueci-senha'),
+      { email: 'gestor@controlog.com' }
+    );
+  });
+
+  test('resetPassword chama o endpoint de redefinir-senha com token e nova senha', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { message: 'ok' } });
+
+    await useAuthStore.getState().resetPassword('token-abc', 'novaSenhaSegura123');
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/redefinir-senha'),
+      { token: 'token-abc', novaSenha: 'novaSenhaSegura123' }
+    );
+  });
+
+  test('resetPassword propaga erro quando o token é inválido', async () => {
+    mockedAxios.post.mockRejectedValue({
+      isAxiosError: true,
+      response: { data: { message: 'Token de redefinição inválido ou expirado.' } },
+    });
+
+    await expect(useAuthStore.getState().resetPassword('invalido', 'novaSenhaSegura123')).rejects.toBeDefined();
+  });
 });

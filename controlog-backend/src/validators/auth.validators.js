@@ -17,3 +17,12 @@ export const loginSchema = z.object({
 export const refreshSchema = z.object({
   refreshToken: z.string().min(1, 'refreshToken é obrigatório.'),
 });
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email('E-mail inválido.'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token é obrigatório.'),
+  novaSenha: z.string().min(8, 'Senha deve ter ao menos 8 caracteres.'),
+});
