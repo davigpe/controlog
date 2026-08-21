@@ -109,6 +109,14 @@ Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GES
 | Entregas | `GET/POST /api/entregas`, `GET/PUT/DELETE /api/entregas/:id` |
 | Dashboard | `GET /api/dashboard/resumo` |
 | Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...` |
+| Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` |
+
+`POST /api/otimizacao-rotas/otimizar` recebe `{ origem: {lat,lng}, pedidos: [{id,lat,lng,endereco?}] }`
+(1 a 50 pedidos) e devolve a melhor ordem de visita (trajeto só de ida, sem voltar à
+origem). Não persiste nada — é só cálculo, em memória, a cada chamada. Usa uma
+heurística local (sem serviço externo de roteamento): nearest-neighbor para a
+construção inicial, seguido de uma melhoria 2-opt, sobre distância em linha reta
+(haversine) entre as coordenadas.
 
 Os endpoints de listagem (`GET /api/motoristas`, `/veiculos`, `/rotas`, `/entregas`) aceitam
 paginação via `?page=1&pageSize=10` (`pageSize` máximo 100) e retornam

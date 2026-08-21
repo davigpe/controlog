@@ -72,9 +72,9 @@ de uma mesma rede por causa de uma única tentativa.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 90 testes em 13 suítes — **94,7% statements**, **95,3% funções**, **74,6% branches**.
+- **Backend:** 105 testes em 15 suítes — **95,5% statements**, **95,7% funções**, **77,8% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 102 testes em 21 suítes — **85% statements**, **77,5% funções**, **86,7% branches**.
+- **Frontend:** 112 testes em 23 suítes — **84,7% statements**, **76,6% funções**, **84,5% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -82,7 +82,10 @@ Ambos acima da meta de 70% definida na RNF07.
 **Lacuna conhecida:** os fluxos de criação de Rota e Entrega que dependem de múltiplos
 `Select` (Radix UI) encadeados têm cobertura mais leve no frontend — a interação com esses
 componentes em jsdom é mais custosa de simular, então essa parte se apoia mais no roteiro
-Playwright de ponta a ponta (seção 5) do que em testes unitários de componente.
+Playwright de ponta a ponta (seção 5) do que em testes unitários de componente. Pelo mesmo
+motivo (jsdom não simula bem o layout que o Leaflet precisa), os componentes de mapa
+(`RotaMapa.tsx`, `OtimizacaoRotasMapa.tsx`) não têm teste automatizado próprio — nos testes
+de página que os usam, esses componentes são mockados, e a verificação real é manual.
 
 ## 3. Casos de teste por requisito funcional
 
@@ -117,6 +120,12 @@ práticas de segurança/escalabilidade:
 | Reset de senha | Redefinir senha com token válido e não expirado | Senha atualizada, token invalidado (`resetTokenHash`/`resetTokenExpiraEm` voltam a `null`) | `tests/auth.service.test.js` |
 | Reset de senha | Redefinir senha com token inexistente ou expirado | `422 ValidationError` — "Token de redefinição inválido ou expirado." | `tests/auth.service.test.js` |
 | Rate limit | Mais de 10 tentativas de login em 15 minutos (mesmo IP + e-mail) | `429 Too Many Requests` | Verificado manualmente (o `express-rate-limit` não é mockável de forma prática em teste unitário) |
+| Otimização de rotas | `haversineKm` entre dois pontos conhecidos | Distância correta (ex.: 1° de latitude ≈ 111,2 km) | `tests/geo.test.js` |
+| Otimização de rotas | `nearestNeighborTour` sobre uma lista de pedidos | Visita cada pedido exatamente uma vez | `tests/geo.test.js` |
+| Otimização de rotas | `twoOptImprove` sobre uma ordem ruim (zigue-zague) | Distância final menor que a da ordem recebida | `tests/geo.test.js` |
+| Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` com pedidos válidos | Retorna `ordem` como permutação dos pedidos com `posicao` sequencial, `distanciaOtimizadaKm <= distanciaOriginalKm` | `tests/otimizacaoRota.service.test.js` |
+| Otimização de rotas | Otimizar com um único pedido (ou nenhum) | `economiaPercentual: 0`, sem divisão por zero | `tests/otimizacaoRota.service.test.js` |
+| Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` sem token | `401 Unauthorized` (RN01 também vale aqui) | `tests/app.test.js` |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -151,6 +160,8 @@ práticas de segurança/escalabilidade:
 | Dashboard | KPIs e distribuição de entregas por status a partir do resumo da API | `src/pages/Dashboard/index.test.tsx` |
 | Relatórios | KPIs por período e troca de filtro de data reconsultando a API | `src/pages/Relatorios/index.test.tsx` |
 | Layout | Sidebar destaca o link ativo; Header mostra usuário logado e faz logout | `src/components/layout/*.test.tsx` |
+| Otimização de rotas | `gerarPedidos` respeita a quantidade pedida, gera pontos dentro do raio e é determinístico com `rng` injetado | `src/pages/OtimizacaoRotas/gerarPedidos.test.ts` |
+| Otimização de rotas | Gerar pedidos habilita "Otimizar Rota"; otimizar chama a API e mostra distâncias/% de economia/lista ordenada; erro da API mostra toast | `src/pages/OtimizacaoRotas/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 

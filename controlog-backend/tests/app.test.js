@@ -17,6 +17,12 @@ describe('app', () => {
     expect(res.body.error).toBe('UnauthorizedError');
   });
 
+  test('POST /api/otimizacao-rotas/otimizar sem token responde 401', async () => {
+    const res = await request(app).post('/api/otimizacao-rotas/otimizar').send({});
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('UnauthorizedError');
+  });
+
   test('rota inexistente responde 404', async () => {
     const res = await request(app).get('/rota-que-nao-existe');
     expect(res.status).toBe(404);

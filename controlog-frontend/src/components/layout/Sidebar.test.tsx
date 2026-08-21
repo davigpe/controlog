@@ -11,8 +11,17 @@ describe('Sidebar', () => {
       </MemoryRouter>
     );
 
-    for (const label of ['Dashboard', 'Entregas', 'Veículos', 'Motoristas', 'Rotas', 'Relatórios']) {
-      expect(screen.getByRole('link', { name: new RegExp(label) })).toBeInTheDocument();
+    for (const label of [
+      'Dashboard',
+      'Entregas',
+      'Veículos',
+      'Motoristas',
+      'Rotas',
+      'Otimização de Rotas',
+      'Relatórios',
+    ]) {
+      // Âncoras no regex evitam que "Rotas" combine com "Otimização de Rotas".
+      expect(screen.getByRole('link', { name: new RegExp(`^${label}$`) })).toBeInTheDocument();
     }
   });
 
@@ -23,7 +32,7 @@ describe('Sidebar', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('link', { name: /Motoristas/ })).toHaveClass('bg-blue-600');
-    expect(screen.getByRole('link', { name: /Rotas/ })).not.toHaveClass('bg-blue-600');
+    expect(screen.getByRole('link', { name: /^Motoristas$/ })).toHaveClass('bg-blue-600');
+    expect(screen.getByRole('link', { name: /^Rotas$/ })).not.toHaveClass('bg-blue-600');
   });
 });
