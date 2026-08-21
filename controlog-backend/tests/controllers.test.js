@@ -3,6 +3,7 @@ import { createAuthController } from '../src/controllers/auth.controller.js';
 import { createDashboardController } from '../src/controllers/dashboard.controller.js';
 import { createEntregaController } from '../src/controllers/entrega.controller.js';
 import { createMotoristaController } from '../src/controllers/motorista.controller.js';
+import { createOtimizacaoRotaController } from '../src/controllers/otimizacaoRota.controller.js';
 import { createRelatorioController } from '../src/controllers/relatorio.controller.js';
 import { createRotaController } from '../src/controllers/rota.controller.js';
 import { createVeiculoController } from '../src/controllers/veiculo.controller.js';
@@ -221,5 +222,20 @@ describe('dashboard.controller e relatorio.controller', () => {
     await controller.getRelatorio({ query: {} }, res, jest.fn());
 
     expect(res.json).toHaveBeenCalledWith({ totalEntregas: 10 });
+  });
+});
+
+describe('otimizacaoRota.controller', () => {
+  test('otimizar responde com o resultado do service', async () => {
+    const resultado = { ordem: [], distanciaOtimizadaKm: 0, distanciaOriginalKm: 0, economiaPercentual: 0 };
+    const service = { otimizar: jest.fn().mockReturnValue(resultado) };
+    const controller = createOtimizacaoRotaController(service);
+    const req = { body: { origem: { lat: 0, lng: 0 }, pedidos: [] } };
+    const res = buildRes();
+
+    await controller.otimizar(req, res, jest.fn());
+
+    expect(service.otimizar).toHaveBeenCalledWith(req.body);
+    expect(res.json).toHaveBeenCalledWith(resultado);
   });
 });
