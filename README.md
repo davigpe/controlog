@@ -17,6 +17,7 @@ O Controlog substitui o controle de rotas e entregas feito hoje em planilhas e W
 * Dashboard com indicadores operacionais em tempo real
 * Relatórios filtráveis por período, com motoristas mais ativos e distribuição por status
 * Visualização de rotas em mapa interativo (origem/destino)
+* Simulador de otimização de rotas: gera pedidos fictícios e calcula a melhor ordem de entrega
 
 ---
 
