@@ -5,16 +5,18 @@ import {
   Truck,
   Users,
   MapPin,
+  Route,
   BarChart2,
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/',            icon: LayoutDashboard, label: 'Dashboard'   },
-  { to: '/entregas',    icon: PackageCheck,    label: 'Entregas'    },
-  { to: '/veiculos',    icon: Truck,           label: 'Veículos'    },
-  { to: '/motoristas',  icon: Users,           label: 'Motoristas'  },
-  { to: '/rotas',       icon: MapPin,          label: 'Rotas'       },
-  { to: '/relatorios',  icon: BarChart2,       label: 'Relatórios'  }, // ← corrigido
+  { to: '/',                  icon: LayoutDashboard, label: 'Dashboard'           },
+  { to: '/entregas',          icon: PackageCheck,    label: 'Entregas'            },
+  { to: '/veiculos',          icon: Truck,           label: 'Veículos'            },
+  { to: '/motoristas',        icon: Users,           label: 'Motoristas'          },
+  { to: '/rotas',             icon: MapPin,          label: 'Rotas'               },
+  { to: '/otimizacao-rotas',  icon: Route,           label: 'Otimização de Rotas' },
+  { to: '/relatorios',        icon: BarChart2,       label: 'Relatórios'          }, // ← corrigido
 ]
 
 export default function Sidebar() {

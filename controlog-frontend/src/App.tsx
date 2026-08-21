@@ -9,6 +9,7 @@ import Entregas    from './pages/Entregas'
 import Veiculos    from './pages/Veiculos'
 import Motoristas  from './pages/Motoristas'
 import Rotas       from './pages/Rotas'
+import OtimizacaoRotas from './pages/OtimizacaoRotas'
 import Relatorios from './pages/Relatorios'
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="veiculos"   element={<Veiculos />}   />
             <Route path="motoristas" element={<Motoristas />} />
             <Route path="rotas"      element={<Rotas />}      />
+            <Route path="otimizacao-rotas" element={<OtimizacaoRotas />} />
             <Route path="relatorios" element={<Relatorios />} />
           </Route>
         </Route>
