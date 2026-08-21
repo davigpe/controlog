@@ -13,6 +13,16 @@ const depositoIcon = new L.Icon({
   popupAnchor: [1, -34],
 });
 
+// Marcador dos pedidos antes de otimizar (ainda sem ordem definida). Ícone
+// explícito, em vez de depender do ícone padrão implícito do Leaflet.
+const pedidoIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
 function iconeNumerado(numero: number) {
   return L.divIcon({
     className: 'otimizacao-rotas-marcador-numerado',
@@ -54,7 +64,7 @@ export default function OtimizacaoRotasMapa({ origem, pedidos, ordem }: Props) {
         <Marker
           key={pedido.id}
           position={[pedido.lat, pedido.lng]}
-          icon={'posicao' in pedido ? iconeNumerado(pedido.posicao) : undefined}
+          icon={'posicao' in pedido ? iconeNumerado(pedido.posicao) : pedidoIcon}
         >
           <Popup>
             {'posicao' in pedido ? `${pedido.posicao}ª parada — ` : ''}
