@@ -17,7 +17,9 @@ const mockedApi = vi.mocked(api, true);
 // mockamos o componente inteiro pra testar só o que a página faz de fato:
 // gerar pedidos, chamar a API de otimização e mostrar o resultado.
 vi.mock('./OtimizacaoRotasMapa', () => ({
-  default: () => <div data-testid="mapa-mock" />,
+  default: ({ rotaReal }: { rotaReal?: unknown }) => (
+    <div data-testid="mapa-mock" data-rota-real={rotaReal ? 'sim' : 'nao'} />
+  ),
 }));
 
 beforeEach(() => {
@@ -58,6 +60,7 @@ describe('OtimizacaoRotas', () => {
         distanciaOtimizadaKm: 8.4,
         distanciaOriginalKm: 12.1,
         economiaPercentual: 30.6,
+        rotaReal: null,
       },
     });
 
@@ -79,6 +82,38 @@ describe('OtimizacaoRotas', () => {
     expect(screen.getByText('30.6%')).toBeInTheDocument();
     expect(screen.getByText('Rua A, 1 - Centro')).toBeInTheDocument();
     expect(screen.getByText('Rota otimizada com sucesso.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Traçado real pelas ruas indisponível no momento — exibindo estimativa em linha reta no mapa.')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('mapa-mock')).toHaveAttribute('data-rota-real', 'nao');
+  });
+
+  test('mostra a distância real quando o traçado pelas ruas está disponível', async () => {
+    const user = userEvent.setup();
+    mockedApi.post.mockResolvedValue({
+      data: {
+        ordem: [{ id: 'pedido-1', lat: -26.31, lng: -48.84, endereco: 'Rua A, 1 - Centro', posicao: 1 }],
+        distanciaOtimizadaKm: 8.4,
+        distanciaOriginalKm: 12.1,
+        economiaPercentual: 30.6,
+        rotaReal: {
+          pontos: [
+            [-26.3045, -48.8487],
+            [-26.31, -48.84],
+          ],
+          distanciaRealKm: 9.7,
+          duracaoMinutos: 14.2,
+        },
+      },
+    });
+
+    renderWithProviders(<OtimizacaoRotas />);
+    await user.click(screen.getByRole('button', { name: /Gerar Pedidos/ }));
+    await user.click(screen.getByRole('button', { name: /Otimizar Rota/ }));
+
+    expect(await screen.findByText(/9.7 km pelas ruas/)).toBeInTheDocument();
+    expect(screen.getByText(/~14 min de condução/)).toBeInTheDocument();
+    expect(screen.getByTestId('mapa-mock')).toHaveAttribute('data-rota-real', 'sim');
   });
 
   test('mostra erro quando a API de otimização falha', async () => {
