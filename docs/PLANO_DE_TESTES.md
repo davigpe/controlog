@@ -72,9 +72,9 @@ de uma mesma rede por causa de uma única tentativa.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 105 testes em 15 suítes — **95,5% statements**, **95,7% funções**, **77,8% branches**.
+- **Backend:** 115 testes em 16 suítes — **95,5% statements**, **95,1% funções**, **78,1% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 112 testes em 23 suítes — **84,7% statements**, **76,6% funções**, **84,5% branches**.
+- **Frontend:** 113 testes em 23 suítes — **84,5% statements**, **76,6% funções**, **83,7% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -86,6 +86,10 @@ Playwright de ponta a ponta (seção 5) do que em testes unitários de component
 motivo (jsdom não simula bem o layout que o Leaflet precisa), os componentes de mapa
 (`RotaMapa.tsx`, `OtimizacaoRotasMapa.tsx`) não têm teste automatizado próprio — nos testes
 de página que os usam, esses componentes são mockados, e a verificação real é manual.
+O traçado real pelas ruas (`roteamentoReal.service.js`, integração com a OpenRouteService)
+tem a lógica de chamada/conversão coberta automaticamente com o `fetch` mockado, mas a
+integração de ponta a ponta contra a API real só é verificada manualmente, com uma
+`ORS_API_KEY` de verdade configurada.
 
 ## 3. Casos de teste por requisito funcional
 
@@ -126,6 +130,9 @@ práticas de segurança/escalabilidade:
 | Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` com pedidos válidos | Retorna `ordem` como permutação dos pedidos com `posicao` sequencial, `distanciaOtimizadaKm <= distanciaOriginalKm` | `tests/otimizacaoRota.service.test.js` |
 | Otimização de rotas | Otimizar com um único pedido (ou nenhum) | `economiaPercentual: 0`, sem divisão por zero | `tests/otimizacaoRota.service.test.js` |
 | Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` sem token | `401 Unauthorized` (RN01 também vale aqui) | `tests/app.test.js` |
+| Otimização de rotas | Traçado real pelas ruas (`obterRotaReal`) sem `ORS_API_KEY` configurada ou sem pedidos | Retorna `null`, sem chamar a API | `tests/roteamentoReal.service.test.js` |
+| Otimização de rotas | Traçado real: API responde erro/indisponível, ou requisição expira | Retorna `null` (nunca lança) — otimização segue funcionando, frontend cai pra linha reta | `tests/roteamentoReal.service.test.js` |
+| Otimização de rotas | Traçado real: resposta válida da ORS | Converte GeoJSON em `{ pontos, distanciaRealKm, duracaoMinutos }` | `tests/roteamentoReal.service.test.js` |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -160,8 +167,9 @@ práticas de segurança/escalabilidade:
 | Dashboard | KPIs e distribuição de entregas por status a partir do resumo da API | `src/pages/Dashboard/index.test.tsx` |
 | Relatórios | KPIs por período e troca de filtro de data reconsultando a API | `src/pages/Relatorios/index.test.tsx` |
 | Layout | Sidebar destaca o link ativo; Header mostra usuário logado e faz logout | `src/components/layout/*.test.tsx` |
-| Otimização de rotas | `gerarPedidos` respeita a quantidade pedida, gera pontos dentro do raio e é determinístico com `rng` injetado | `src/pages/OtimizacaoRotas/gerarPedidos.test.ts` |
+| Otimização de rotas | `gerarPedidos` sorteia um bairro real por pedido, espalha dentro do raio configurado ao redor do centro do bairro e é determinístico com `rng` injetado | `src/pages/OtimizacaoRotas/gerarPedidos.test.ts` |
 | Otimização de rotas | Gerar pedidos habilita "Otimizar Rota"; otimizar chama a API e mostra distâncias/% de economia/lista ordenada; erro da API mostra toast | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Otimização de rotas | Com `rotaReal` vindo da API, mostra distância/duração reais e repassa o traçado pro mapa; sem `rotaReal`, mostra aviso de estimativa em linha reta | `src/pages/OtimizacaoRotas/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 
