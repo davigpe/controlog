@@ -20,7 +20,7 @@ export default function OtimizacaoRotas() {
   const otimizarMutation = useOtimizarRota();
 
   function handleGerarPedidos() {
-    setPedidos(gerarPedidos(quantidade, DEPOSITO));
+    setPedidos(gerarPedidos(quantidade));
     otimizarMutation.reset();
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { DEPOSITO, gerarPedidos } from './gerarPedidos';
+import { BAIRROS, gerarPedidos } from './gerarPedidos';
 
 // Gerador determinístico simples (mulberry32) — permite asserções exatas em
 // vez de só checar limites, sem precisar de dependência nova.
@@ -25,9 +25,17 @@ function distanciaKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Extrai o nome do bairro a partir do texto "Rua X, 123 - Bairro" gerado.
+function bairroDoEndereco(endereco: string) {
+  const nome = endereco.split(' - ').pop();
+  const bairro = BAIRROS.find((b) => b.nome === nome);
+  if (!bairro) throw new Error(`Bairro não encontrado para endereço: ${endereco}`);
+  return bairro;
+}
+
 describe('gerarPedidos', () => {
   test('gera a quantidade solicitada, com ids únicos e sequenciais', () => {
-    const pedidos = gerarPedidos(8, DEPOSITO, { rng: criarRngDeterministico(1) });
+    const pedidos = gerarPedidos(8, { rng: criarRngDeterministico(1) });
 
     expect(pedidos).toHaveLength(8);
     expect(pedidos.map((p) => p.id)).toEqual([
@@ -43,29 +51,31 @@ describe('gerarPedidos', () => {
   });
 
   test('retorna lista vazia para quantidade 0', () => {
-    expect(gerarPedidos(0, DEPOSITO)).toEqual([]);
+    expect(gerarPedidos(0)).toEqual([]);
   });
 
-  test('todos os pontos ficam dentro do raio configurado', () => {
-    const raioKm = 10;
-    const pedidos = gerarPedidos(30, DEPOSITO, { raioKm, rng: criarRngDeterministico(42) });
+  test('todos os pontos ficam dentro do raio configurado em relação ao centro do próprio bairro', () => {
+    const raioKm = 2;
+    const pedidos = gerarPedidos(30, { raioKm, rng: criarRngDeterministico(42) });
 
     for (const pedido of pedidos) {
-      expect(distanciaKm(DEPOSITO, pedido)).toBeLessThanOrEqual(raioKm + 0.01);
+      const bairro = bairroDoEndereco(pedido.endereco);
+      expect(distanciaKm(bairro, pedido)).toBeLessThanOrEqual(raioKm + 0.01);
     }
   });
 
   test('é determinístico para o mesmo rng (mesma seed)', () => {
-    const a = gerarPedidos(5, DEPOSITO, { rng: criarRngDeterministico(7) });
-    const b = gerarPedidos(5, DEPOSITO, { rng: criarRngDeterministico(7) });
+    const a = gerarPedidos(5, { rng: criarRngDeterministico(7) });
+    const b = gerarPedidos(5, { rng: criarRngDeterministico(7) });
 
     expect(a).toEqual(b);
   });
 
-  test('cada pedido tem um endereço não vazio', () => {
-    const pedidos = gerarPedidos(5, DEPOSITO, { rng: criarRngDeterministico(3) });
+  test('cada pedido tem um endereço não vazio e um bairro reconhecido', () => {
+    const pedidos = gerarPedidos(5, { rng: criarRngDeterministico(3) });
     for (const pedido of pedidos) {
       expect(pedido.endereco.length).toBeGreaterThan(0);
+      expect(() => bairroDoEndereco(pedido.endereco)).not.toThrow();
     }
   });
 });
