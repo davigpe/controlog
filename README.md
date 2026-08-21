@@ -17,6 +17,7 @@ O Controlog substitui o controle de rotas e entregas feito hoje em planilhas e W
 * Dashboard com indicadores operacionais em tempo real
 * Relatórios filtráveis por período, com motoristas mais ativos e distribuição por status
 * Visualização de rotas em mapa interativo (origem/destino)
+* Simulador de otimização de rotas: gera pedidos fictícios, calcula a melhor ordem de entrega e desenha o traçado real pelas ruas (via OpenRouteService, com fallback em linha reta)
 
 ---
 
@@ -149,10 +150,28 @@ reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## 👥 Colaboração
 
-1. Crie uma branch: `git checkout -b minha-feature`
-2. Faça commits seguindo Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`)
-3. Envie para o repositório: `git push origin minha-feature`
-4. Abra um Pull Request
+O repositório segue o modelo **Git Flow**:
+
+| Branch | Propósito |
+|---|---|
+| `main` | Produção — só recebe merge de `release/*` ou `hotfix/*`. Dispara o deploy automático (Railway). |
+| `develop` | Integração — base para novas features, sempre com o estado mais recente pronto para o próximo release. |
+| `feature/nome-da-feature` | Uma funcionalidade em desenvolvimento, criada a partir de `develop`, mesclada de volta nela. |
+| `release/x.y.z` | Estabilização de uma versão antes de publicar — criada a partir de `develop`, mesclada em `main` **e** `develop`. |
+| `hotfix/nome-do-fix` | Correção urgente em produção — criada a partir de `main`, mesclada em `main` **e** `develop`. |
+
+Fluxo típico para uma nova funcionalidade:
+
+```bash
+git checkout develop
+git pull
+git checkout -b feature/minha-feature
+# ...commits seguindo Conventional Commits (feat:, fix:, docs:, refactor:, test:)...
+git push -u origin feature/minha-feature
+# Abrir Pull Request de feature/minha-feature → develop
+```
+
+O repositório usa a extensão [git-flow (AVH Edition)](https://github.com/petervanderdoes/gitflow-avh); depois de instalada, os comandos `git flow feature start/finish`, `git flow release start/finish` e `git flow hotfix start/finish` automatizam esse fluxo.
 
 ---
 

@@ -12,6 +12,7 @@ import Motoristas from '@/pages/Motoristas';
 import Veiculos from '@/pages/Veiculos';
 import Entregas from '@/pages/Entregas';
 import Rotas from '@/pages/Rotas';
+import OtimizacaoRotas from '@/pages/OtimizacaoRotas';
 import Relatorios from '@/pages/Relatorios';
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -97,6 +98,12 @@ describe('acessibilidade (regressão estrutural)', () => {
     const { container, findByRole } = renderWithProviders(<Rotas />);
     await user.click(await findByRole('button', { name: /Nova Rota/i }));
     await findByRole('dialog');
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Otimização de Rotas (estado inicial, sem pedidos gerados) não tem violações de acessibilidade', async () => {
+    const { container, findByText } = renderWithProviders(<OtimizacaoRotas />);
+    await findByText('Gere pedidos simulados para começar.');
     await expect(axe(container)).resolves.toHaveNoViolations();
   });
 
