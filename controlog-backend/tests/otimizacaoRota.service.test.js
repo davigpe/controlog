@@ -1,9 +1,11 @@
-import { otimizacaoRotaService } from '../src/services/otimizacaoRota.service.js';
+import { jest } from '@jest/globals';
+import { createOtimizacaoRotaService } from '../src/services/otimizacaoRota.service.js';
 
 const origem = { lat: -26.3045, lng: -48.8487 };
+const semRotaReal = createOtimizacaoRotaService({ buscarRotaReal: async () => null });
 
 describe('otimizacaoRota.service', () => {
-  test('retorna a ordem otimizada como permutação dos pedidos recebidos, com posição sequencial', () => {
+  test('retorna a ordem otimizada como permutação dos pedidos recebidos, com posição sequencial', async () => {
     const pedidos = [
       { id: 'p1', lat: -26.31, lng: -48.84 },
       { id: 'p2', lat: -26.29, lng: -48.86 },
@@ -11,14 +13,14 @@ describe('otimizacaoRota.service', () => {
       { id: 'p4', lat: -26.28, lng: -48.83 },
     ];
 
-    const resultado = otimizacaoRotaService.otimizar({ origem, pedidos });
+    const resultado = await semRotaReal.otimizar({ origem, pedidos });
 
     expect(resultado.ordem).toHaveLength(pedidos.length);
     expect(new Set(resultado.ordem.map((p) => p.id))).toEqual(new Set(pedidos.map((p) => p.id)));
     expect(resultado.ordem.map((p) => p.posicao)).toEqual([1, 2, 3, 4]);
   });
 
-  test('a distância otimizada nunca é maior que a distância original', () => {
+  test('a distância otimizada nunca é maior que a distância original', async () => {
     const pedidos = [
       { id: 'p1', lat: -26.31, lng: -48.84 },
       { id: 'p2', lat: -26.29, lng: -48.86 },
@@ -27,26 +29,60 @@ describe('otimizacaoRota.service', () => {
       { id: 'p5', lat: -26.35, lng: -48.88 },
     ];
 
-    const resultado = otimizacaoRotaService.otimizar({ origem, pedidos });
+    const resultado = await semRotaReal.otimizar({ origem, pedidos });
 
     expect(resultado.distanciaOtimizadaKm).toBeLessThanOrEqual(resultado.distanciaOriginalKm + 1e-9);
     expect(resultado.economiaPercentual).toBeGreaterThanOrEqual(0);
   });
 
-  test('economiaPercentual é 0 quando há apenas um pedido (evita divisão por zero)', () => {
+  test('economiaPercentual é 0 quando há apenas um pedido (evita divisão por zero)', async () => {
     const pedidos = [{ id: 'p1', lat: -26.31, lng: -48.84 }];
 
-    const resultado = otimizacaoRotaService.otimizar({ origem, pedidos });
+    const resultado = await semRotaReal.otimizar({ origem, pedidos });
 
     expect(resultado.distanciaOtimizadaKm).toBe(resultado.distanciaOriginalKm);
     expect(resultado.economiaPercentual).toBe(0);
   });
 
-  test('economiaPercentual é 0 quando não há pedidos (distância original zero)', () => {
-    const resultado = otimizacaoRotaService.otimizar({ origem, pedidos: [] });
+  test('economiaPercentual é 0 quando não há pedidos (distância original zero)', async () => {
+    const resultado = await semRotaReal.otimizar({ origem, pedidos: [] });
 
     expect(resultado.ordem).toEqual([]);
     expect(resultado.distanciaOriginalKm).toBe(0);
     expect(resultado.economiaPercentual).toBe(0);
+  });
+
+  test('rotaReal é null quando o traçado real não está disponível', async () => {
+    const resultado = await semRotaReal.otimizar({
+      origem,
+      pedidos: [{ id: 'p1', lat: -26.31, lng: -48.84 }],
+    });
+
+    expect(resultado.rotaReal).toBeNull();
+  });
+
+  test('rotaReal é repassado quando o traçado real está disponível', async () => {
+    const rotaFake = { pontos: [[-26.3, -48.84]], distanciaRealKm: 5, duracaoMinutos: 10 };
+    const service = createOtimizacaoRotaService({ buscarRotaReal: async () => rotaFake });
+
+    const resultado = await service.otimizar({
+      origem,
+      pedidos: [{ id: 'p1', lat: -26.31, lng: -48.84 }],
+    });
+
+    expect(resultado.rotaReal).toEqual(rotaFake);
+  });
+
+  test('busca o traçado real com a origem e a ordem já otimizada', async () => {
+    const buscarRotaReal = jest.fn().mockResolvedValue(null);
+    const service = createOtimizacaoRotaService({ buscarRotaReal });
+    const pedidos = [{ id: 'p1', lat: -26.31, lng: -48.84 }];
+
+    await service.otimizar({ origem, pedidos });
+
+    expect(buscarRotaReal).toHaveBeenCalledWith({
+      origem,
+      pontosOrdenados: [{ id: 'p1', lat: -26.31, lng: -48.84, posicao: 1 }],
+    });
   });
 });

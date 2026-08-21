@@ -25,4 +25,7 @@ export const env = {
   ),
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+  // Opcional — sem essa chave, a otimização de rotas continua funcionando
+  // normalmente, só sem o traçado real pelas ruas (cai pra linha reta).
+  orsApiKey: process.env.ORS_API_KEY ?? '',
 };

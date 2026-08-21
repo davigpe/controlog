@@ -227,8 +227,14 @@ describe('dashboard.controller e relatorio.controller', () => {
 
 describe('otimizacaoRota.controller', () => {
   test('otimizar responde com o resultado do service', async () => {
-    const resultado = { ordem: [], distanciaOtimizadaKm: 0, distanciaOriginalKm: 0, economiaPercentual: 0 };
-    const service = { otimizar: jest.fn().mockReturnValue(resultado) };
+    const resultado = {
+      ordem: [],
+      distanciaOtimizadaKm: 0,
+      distanciaOriginalKm: 0,
+      economiaPercentual: 0,
+      rotaReal: null,
+    };
+    const service = { otimizar: jest.fn().mockResolvedValue(resultado) };
     const controller = createOtimizacaoRotaController(service);
     const req = { body: { origem: { lat: 0, lng: 0 }, pedidos: [] } };
     const res = buildRes();

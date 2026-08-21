@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { aplicarFixIconesLeaflet } from '@/lib/leafletIconFix';
-import type { Coordenada, ParadaOtimizada, Pedido } from './types';
+import type { Coordenada, ParadaOtimizada, Pedido, RotaReal } from './types';
 
 aplicarFixIconesLeaflet();
 
@@ -36,14 +36,19 @@ interface Props {
   origem: Coordenada;
   pedidos: Pedido[];
   ordem?: ParadaOtimizada[];
+  rotaReal?: RotaReal | null;
 }
 
-export default function OtimizacaoRotasMapa({ origem, pedidos, ordem }: Props) {
+export default function OtimizacaoRotasMapa({ origem, pedidos, ordem, rotaReal }: Props) {
   const bounds: [number, number][] = [origem, ...pedidos].map((p) => [p.lat, p.lng]);
   const paradas: (Pedido | ParadaOtimizada)[] = ordem ?? pedidos;
-  const linha: [number, number][] = ordem
+  const linhaReta: [number, number][] = ordem
     ? [[origem.lat, origem.lng], ...ordem.map((p): [number, number] => [p.lat, p.lng])]
     : [];
+  // Com o traçado real disponível, desenha ele (sólido); sem, cai na estimativa em
+  // linha reta (tracejada, deixa claro que não segue as ruas de fato).
+  const linha = rotaReal?.pontos ?? linhaReta;
+  const tracadoReal = Boolean(rotaReal);
 
   return (
     <MapContainer
@@ -73,7 +78,14 @@ export default function OtimizacaoRotasMapa({ origem, pedidos, ordem }: Props) {
         </Marker>
       ))}
 
-      {linha.length > 0 && <Polyline positions={linha} color="#2563eb" weight={3} />}
+      {linha.length > 0 && (
+        <Polyline
+          positions={linha}
+          color="#2563eb"
+          weight={3}
+          dashArray={tracadoReal ? undefined : '8, 8'}
+        />
+      )}
     </MapContainer>
   );
 }

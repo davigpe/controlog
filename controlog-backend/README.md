@@ -113,10 +113,17 @@ Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GES
 
 `POST /api/otimizacao-rotas/otimizar` recebe `{ origem: {lat,lng}, pedidos: [{id,lat,lng,endereco?}] }`
 (1 a 50 pedidos) e devolve a melhor ordem de visita (trajeto só de ida, sem voltar à
-origem). Não persiste nada — é só cálculo, em memória, a cada chamada. Usa uma
-heurística local (sem serviço externo de roteamento): nearest-neighbor para a
+origem). Não persiste nada — é só cálculo, em memória, a cada chamada. A ordem é
+decidida por uma heurística local (sem serviço externo): nearest-neighbor para a
 construção inicial, seguido de uma melhoria 2-opt, sobre distância em linha reta
 (haversine) entre as coordenadas.
+
+A resposta também inclui `rotaReal` — o traçado real pelas ruas (pontos, distância e
+duração), obtido de graça via [OpenRouteService](https://openrouteservice.org/dev/#/signup)
+a partir da ordem já otimizada. Precisa da variável de ambiente `ORS_API_KEY`; sem ela
+(ou se a chamada falhar/expirar/atingir o limite de requisições), `rotaReal` vem `null`
+e o frontend cai de volta pra desenhar a linha reta entre as paradas — a otimização em
+si nunca depende desse serviço externo.
 
 Os endpoints de listagem (`GET /api/motoristas`, `/veiculos`, `/rotas`, `/entregas`) aceitam
 paginação via `?page=1&pageSize=10` (`pageSize` máximo 100) e retornam

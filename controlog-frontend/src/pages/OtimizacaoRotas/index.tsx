@@ -97,7 +97,29 @@ export default function OtimizacaoRotas() {
             </div>
           )}
 
-          <OtimizacaoRotasMapa origem={DEPOSITO} pedidos={pedidos} ordem={resultado?.ordem} />
+          <OtimizacaoRotasMapa
+            origem={DEPOSITO}
+            pedidos={pedidos}
+            ordem={resultado?.ordem}
+            rotaReal={resultado?.rotaReal}
+          />
+
+          {resultado &&
+            (resultado.rotaReal ? (
+              <div className="rounded-lg border bg-indigo-50 border-indigo-100 p-4 text-sm text-gray-700">
+                <span className="font-semibold text-indigo-700">
+                  {resultado.rotaReal.distanciaRealKm.toFixed(1)} km pelas ruas
+                </span>{' '}
+                (~{Math.round(resultado.rotaReal.duracaoMinutos)} min de condução) — traçado real via
+                OpenRouteService. As distâncias acima são a estimativa em linha reta usada pra calcular
+                a ordem de entrega.
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Traçado real pelas ruas indisponível no momento — exibindo estimativa em linha reta no
+                mapa.
+              </p>
+            ))}
 
           <div className="rounded-lg border overflow-hidden">
             <table className="w-full text-sm">
