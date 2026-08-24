@@ -71,12 +71,16 @@ export function gerarPedidos(quantidade: number, opcoes: OpcoesGeracao = {}): Pe
     const lat = bairro.lat + (distanciaKm * Math.cos(angulo)) / KM_POR_GRAU_LATITUDE;
     const lng = bairro.lng + (distanciaKm * Math.sin(angulo)) / kmPorGrauLongitude;
     const numero = Math.floor(rng() * 2000) + 1;
+    const unidades = Math.floor(rng() * 20) + 1;
+    const volumeM3 = Math.round((rng() * 0.9 + 0.1) * 100) / 100;
 
     pedidos.push({
       id: `pedido-${i + 1}`,
       lat,
       lng,
       endereco: `${escolher(RUAS, rng)}, ${numero} - ${bairro.nome}`,
+      unidades,
+      volumeM3,
     });
   }
 

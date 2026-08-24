@@ -6,6 +6,9 @@ export interface Coordenada {
 export interface Pedido extends Coordenada {
   id: string;
   endereco: string;
+  /** Fictícios, só pra alimentar os agregados da tabela de rotas. */
+  unidades: number;
+  volumeM3: number;
 }
 
 export interface ParadaOtimizada extends Pedido {
