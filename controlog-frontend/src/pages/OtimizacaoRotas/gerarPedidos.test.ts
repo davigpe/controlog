@@ -78,4 +78,19 @@ describe('gerarPedidos', () => {
       expect(() => bairroDoEndereco(pedido.endereco)).not.toThrow();
     }
   });
+
+  test('unidades e volume vêm em faixas plausíveis, determinísticos com o mesmo rng', () => {
+    const pedidos = gerarPedidos(10, { rng: criarRngDeterministico(11) });
+    for (const pedido of pedidos) {
+      expect(pedido.unidades).toBeGreaterThanOrEqual(1);
+      expect(pedido.unidades).toBeLessThanOrEqual(20);
+      expect(pedido.volumeM3).toBeGreaterThanOrEqual(0.1);
+      expect(pedido.volumeM3).toBeLessThanOrEqual(1);
+    }
+
+    const repetido = gerarPedidos(10, { rng: criarRngDeterministico(11) });
+    expect(repetido.map((p) => [p.unidades, p.volumeM3])).toEqual(
+      pedidos.map((p) => [p.unidades, p.volumeM3])
+    );
+  });
 });

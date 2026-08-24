@@ -74,7 +74,7 @@ de uma mesma rede por causa de uma única tentativa.
 
 - **Backend:** 115 testes em 16 suítes — **95,5% statements**, **95,1% funções**, **78,1% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 113 testes em 23 suítes — **84,5% statements**, **76,6% funções**, **83,7% branches**.
+- **Frontend:** 141 testes em 25 suítes — **80,4% statements**, **74,0% funções**, **78,7% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -89,7 +89,10 @@ de página que os usam, esses componentes são mockados, e a verificação real 
 O traçado real pelas ruas (`roteamentoReal.service.js`, integração com a OpenRouteService)
 tem a lógica de chamada/conversão coberta automaticamente com o `fetch` mockado, mas a
 integração de ponta a ponta contra a API real só é verificada manualmente, com uma
-`ORS_API_KEY` de verdade configurada.
+`ORS_API_KEY` de verdade configurada. Pelo mesmo motivo do Leaflet, a interação real de
+desenhar um polígono no mapa (cliques de mouse formando os vértices) também só é
+verificada manualmente — o teste de página simula "desenhar um polígono" chamando
+diretamente o callback que o mapa mockado expõe, com coordenadas fixas.
 
 ## 3. Casos de teste por requisito funcional
 
@@ -133,6 +136,8 @@ práticas de segurança/escalabilidade:
 | Otimização de rotas | Traçado real pelas ruas (`obterRotaReal`) sem `ORS_API_KEY` configurada ou sem pedidos | Retorna `null`, sem chamar a API | `tests/roteamentoReal.service.test.js` |
 | Otimização de rotas | Traçado real: API responde erro/indisponível, ou requisição expira | Retorna `null` (nunca lança) — otimização segue funcionando, frontend cai pra linha reta | `tests/roteamentoReal.service.test.js` |
 | Otimização de rotas | Traçado real: resposta válida da ORS | Converte GeoJSON em `{ pontos, distanciaRealKm, duracaoMinutos }` | `tests/roteamentoReal.service.test.js` |
+| Otimização de rotas | Seleção de pedidos por polígono (ray-casting) | Ponto dentro/fora/na borda de um polígono conhecido, inclusive côncavo | `pontoNoPoligono.test.ts` (frontend) |
+| Otimização de rotas | Criar/atribuir/desatribuir/excluir/renomear rota simulada | Mantém a invariante 1 pedido = 1 rota; `rotasAfetadas` identifica corretamente 1 ou 2 rotas afetadas por transição | `rotasSimuladas.test.ts` (frontend) |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -167,9 +172,11 @@ práticas de segurança/escalabilidade:
 | Dashboard | KPIs e distribuição de entregas por status a partir do resumo da API | `src/pages/Dashboard/index.test.tsx` |
 | Relatórios | KPIs por período e troca de filtro de data reconsultando a API | `src/pages/Relatorios/index.test.tsx` |
 | Layout | Sidebar destaca o link ativo; Header mostra usuário logado e faz logout | `src/components/layout/*.test.tsx` |
-| Otimização de rotas | `gerarPedidos` sorteia um bairro real por pedido, espalha dentro do raio configurado ao redor do centro do bairro e é determinístico com `rng` injetado | `src/pages/OtimizacaoRotas/gerarPedidos.test.ts` |
-| Otimização de rotas | Gerar pedidos habilita "Otimizar Rota"; otimizar chama a API e mostra distâncias/% de economia/lista ordenada; erro da API mostra toast | `src/pages/OtimizacaoRotas/index.test.tsx` |
-| Otimização de rotas | Com `rotaReal` vindo da API, mostra distância/duração reais e repassa o traçado pro mapa; sem `rotaReal`, mostra aviso de estimativa em linha reta | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Otimização de rotas | `gerarPedidos` sorteia um bairro real por pedido (incluindo unidades/volume fictícios), espalha dentro do raio configurado ao redor do centro do bairro e é determinístico com `rng` injetado | `src/pages/OtimizacaoRotas/gerarPedidos.test.ts` |
+| Otimização de rotas | Desenhar um polígono seleciona só os pedidos dentro dele; "Criar rota" monta a rota, chama a API e mostra os agregados (pedidos/unidades/volume/status) na tabela | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Otimização de rotas | Mover pedidos entre rotas (ação de linha "Atribuir/Desatribuir pedidos" + polígono) recalcula só as rotas cujo `pedidoIds` mudou, pulando rotas vazias | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Otimização de rotas | Renomear, excluir (com confirmação) e focar/desfocar uma rota pelo clique na linha da tabela | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Otimização de rotas | Erro da API ao recalcular marca a rota como "Erro" e mostra toast, sem quebrar as demais rotas | `src/pages/OtimizacaoRotas/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 
