@@ -4,6 +4,8 @@ import { createDashboardController } from '../src/controllers/dashboard.controll
 import { createEntregaController } from '../src/controllers/entrega.controller.js';
 import { createMotoristaController } from '../src/controllers/motorista.controller.js';
 import { createOtimizacaoRotaController } from '../src/controllers/otimizacaoRota.controller.js';
+import { createPedidoController } from '../src/controllers/pedido.controller.js';
+import { createPlanoController } from '../src/controllers/plano.controller.js';
 import { createRelatorioController } from '../src/controllers/relatorio.controller.js';
 import { createRotaController } from '../src/controllers/rota.controller.js';
 import { createVeiculoController } from '../src/controllers/veiculo.controller.js';
@@ -243,5 +245,89 @@ describe('otimizacaoRota.controller', () => {
 
     expect(service.otimizar).toHaveBeenCalledWith(req.body);
     expect(res.json).toHaveBeenCalledWith(resultado);
+  });
+});
+
+describe('pedido.controller', () => {
+  test('gerar responde 201 com os pedidos criados', async () => {
+    const pedidos = [{ id: 'p1' }];
+    const service = { gerar: jest.fn().mockResolvedValue(pedidos) };
+    const controller = createPedidoController(service);
+    const req = { body: { quantidade: 1 } };
+    const res = buildRes();
+
+    await controller.gerar(req, res, jest.fn());
+
+    expect(service.gerar).toHaveBeenCalledWith(req.body);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(pedidos);
+  });
+
+  test('list responde com o resultado do service', async () => {
+    const resultado = { items: [], pagination: { page: 1, pageSize: 10, total: 0, totalPages: 1 } };
+    const service = { list: jest.fn().mockResolvedValue(resultado) };
+    const controller = createPedidoController(service);
+    const req = { query: {} };
+    const res = buildRes();
+
+    await controller.list(req, res, jest.fn());
+
+    expect(service.list).toHaveBeenCalledWith(req.query);
+    expect(res.json).toHaveBeenCalledWith(resultado);
+  });
+});
+
+describe('plano.controller', () => {
+  test('create responde 201 com o plano criado', async () => {
+    const plano = { id: 'plano1' };
+    const service = { create: jest.fn().mockResolvedValue(plano) };
+    const controller = createPlanoController(service);
+    const req = { body: { nome: 'X', pedidoIds: ['p1'] } };
+    const res = buildRes();
+
+    await controller.create(req, res, jest.fn());
+
+    expect(service.create).toHaveBeenCalledWith(req.body);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(plano);
+  });
+
+  test('getById responde com o plano', async () => {
+    const plano = { id: 'plano1' };
+    const service = { getById: jest.fn().mockResolvedValue(plano) };
+    const controller = createPlanoController(service);
+    const req = { params: { id: 'plano1' } };
+    const res = buildRes();
+
+    await controller.getById(req, res, jest.fn());
+
+    expect(service.getById).toHaveBeenCalledWith('plano1');
+    expect(res.json).toHaveBeenCalledWith(plano);
+  });
+
+  test('otimizar responde com o plano otimizado', async () => {
+    const plano = { id: 'plano1', status: 'OTIMIZADO' };
+    const service = { otimizar: jest.fn().mockResolvedValue(plano) };
+    const controller = createPlanoController(service);
+    const req = { params: { id: 'plano1' }, body: { tamanhoRota: 5 } };
+    const res = buildRes();
+
+    await controller.otimizar(req, res, jest.fn());
+
+    expect(service.otimizar).toHaveBeenCalledWith('plano1', { tamanhoRota: 5 });
+    expect(res.json).toHaveBeenCalledWith(plano);
+  });
+
+  test('remove responde 204', async () => {
+    const service = { remove: jest.fn().mockResolvedValue(undefined) };
+    const controller = createPlanoController(service);
+    const req = { params: { id: 'plano1' } };
+    const res = buildRes();
+
+    await controller.remove(req, res, jest.fn());
+
+    expect(service.remove).toHaveBeenCalledWith('plano1');
+    expect(res.status).toHaveBeenCalledWith(204);
+    expect(res.send).toHaveBeenCalled();
   });
 });

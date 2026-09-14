@@ -40,6 +40,11 @@ enum EntregaStatus {
   CANCELADA
 }
 
+enum PlanoStatus {
+  ABERTO
+  OTIMIZADO
+}
+
 model Usuario {
   id                  String        @id @default(uuid())
   nome                String
@@ -120,4 +125,38 @@ model Entrega {
   motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
 
   @@map("entregas")
+}
+
+model Plano {
+  id       String      @id @default(uuid())
+  nome     String
+  status   PlanoStatus @default(ABERTO)
+  criadoEm DateTime    @default(now()) @map("criado_em")
+
+  pedidos Pedido[]
+
+  @@map("planos")
+}
+
+// Pedidos fictícios pro módulo de planejamento (Pedidos/Planos) — não tem
+// relação com o ERP real nem com o model Entrega (que já representa entregas
+// de verdade vinculadas a Rota/Motorista, com suas próprias regras de negócio).
+model Pedido {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  cliente   String
+  endereco  String
+  cidade    String
+  lat       Float
+  lng       Float
+  unidades  Int
+  volumeM3  Float    @map("volume_m3")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  planoId   String?  @map("plano_id")
+  plano     Plano?   @relation(fields: [planoId], references: [id], onDelete: SetNull)
+  // Grupo (1, 2, 3...) atribuído ao otimizar o plano — null até otimizar.
+  rotaIndex Int?     @map("rota_index")
+
+  @@map("pedidos")
 }
