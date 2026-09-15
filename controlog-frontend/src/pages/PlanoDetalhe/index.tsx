@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage } from '@/lib/api';
+import { useOtimizarRota } from '@/pages/OtimizacaoRotas/api';
+import { DEPOSITO } from '@/pages/OtimizacaoRotas/gerarPedidos';
 import { PALETA_CORES, TIPOS_VEICULO } from '@/pages/OtimizacaoRotas/rotasSimuladas';
+import type { ResultadoOtimizacao } from '@/pages/OtimizacaoRotas/types';
 import type { Pedido } from '@/pages/Pedidos/types';
 import type { StatusPlano } from '@/pages/Planos/types';
 import { useOtimizarPlano, usePlano, useRenomearPlano } from './api';
+import PlanoMapa, { type GrupoNoMapa } from './PlanoMapa';
 import RenomearPlanoModal from './RenomearPlanoModal';
 
 const TAMANHO_ROTA_PADRAO = 10;
@@ -74,6 +78,10 @@ export default function PlanoDetalhe() {
   const { data: plano, isLoading } = usePlano(id ?? '');
   const otimizarMutation = useOtimizarPlano(id ?? '');
   const renomearMutation = useRenomearPlano(id ?? '');
+  const otimizarRotaMutation = useOtimizarRota();
+
+  const [resultadosPorGrupo, setResultadosPorGrupo] = useState<Record<number, ResultadoOtimizacao | null>>({});
+  const [statusPorGrupo, setStatusPorGrupo] = useState<Record<number, 'calculando' | 'calculada' | 'erro'>>({});
 
   const grupos = useMemo(() => {
     if (!plano || plano.status !== 'OTIMIZADO') return null;
@@ -84,6 +92,53 @@ export default function PlanoDetalhe() {
     }
     return Array.from(mapa.entries()).sort(([a], [b]) => a - b);
   }, [plano]);
+
+  const assinaturaGrupos = grupos
+    ? grupos.map(([indice, pedidos]) => `${indice}:${pedidos.map((p) => p.id).join(',')}`).join('|')
+    : '';
+
+  // Sequencial (não Promise.all) — mesmo motivo da Otimização de Rotas: evita
+  // rajada simultânea de chamadas à ORS, que tem limite de requisições por
+  // minuto no plano gratuito.
+  useEffect(() => {
+    if (!grupos) return;
+    let cancelado = false;
+
+    async function calcularTracadoDasRotas() {
+      for (const [indice, pedidos] of grupos!) {
+        setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'calculando' }));
+        try {
+          const resultado = await otimizarRotaMutation.mutateAsync({ origem: DEPOSITO, pedidos });
+          if (cancelado) return;
+          setResultadosPorGrupo((atual) => ({ ...atual, [indice]: resultado }));
+          setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'calculada' }));
+        } catch (error) {
+          if (cancelado) return;
+          setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'erro' }));
+          toast.error(getErrorMessage(error, 'Não foi possível calcular o traçado de uma das rotas.'));
+        }
+      }
+    }
+
+    void calcularTracadoDasRotas();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assinaturaGrupos]);
+
+  const gruposParaMapa: GrupoNoMapa[] = useMemo(
+    () =>
+      (grupos ?? []).map(([indice, pedidos]) => ({
+        indice,
+        cor: corDoGrupo(indice - 1),
+        pedidos,
+        resultado: resultadosPorGrupo[indice] ?? null,
+      })),
+    [grupos, resultadosPorGrupo]
+  );
+
+  const calculandoRotasNoMapa = (grupos ?? []).some(([indice]) => statusPorGrupo[indice] === 'calculando');
 
   function handleOtimizar() {
     otimizarMutation.mutate(tamanhoRota, {
@@ -156,6 +211,16 @@ export default function PlanoDetalhe() {
           {otimizarMutation.isPending ? 'Otimizando...' : 'Otimizar Plano'}
         </Button>
       </div>
+
+      {gruposParaMapa.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="font-semibold text-sm">Mapa das rotas</h2>
+          {calculandoRotasNoMapa && (
+            <p className="text-xs text-muted-foreground">Calculando traçado das rotas...</p>
+          )}
+          <PlanoMapa origem={DEPOSITO} grupos={gruposParaMapa} />
+        </div>
+      )}
 
       {plano.pedidos.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
