@@ -74,7 +74,7 @@ de uma mesma rede por causa de uma única tentativa.
 
 - **Backend:** 136 testes em 18 suítes — **94,6% statements**, **92,7% funções**, **76,1% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 156 testes em 28 suítes — **81,5% statements**, **75,5% funções**, **78,1% branches**.
+- **Frontend:** 158 testes em 28 suítes — **80,4% statements**, **74,3% funções**, **76,5% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -84,8 +84,9 @@ Ambos acima da meta de 70% definida na RNF07.
 componentes em jsdom é mais custosa de simular, então essa parte se apoia mais no roteiro
 Playwright de ponta a ponta (seção 5) do que em testes unitários de componente. Pelo mesmo
 motivo (jsdom não simula bem o layout que o Leaflet precisa), os componentes de mapa
-(`RotaMapa.tsx`, `OtimizacaoRotasMapa.tsx`) não têm teste automatizado próprio — nos testes
-de página que os usam, esses componentes são mockados, e a verificação real é manual.
+(`RotaMapa.tsx`, `OtimizacaoRotasMapa.tsx`, `PlanoMapa.tsx`) não têm teste automatizado
+próprio — nos testes de página que os usam, esses componentes são mockados, e a
+verificação real é manual.
 O traçado real pelas ruas (`roteamentoReal.service.js`, integração com a OpenRouteService)
 tem a lógica de chamada/conversão coberta automaticamente com o `fetch` mockado, mas a
 integração de ponta a ponta contra a API real só é verificada manualmente, com uma
@@ -143,6 +144,7 @@ práticas de segurança/escalabilidade:
 | Pedidos/Planos | Criar plano com pedido já vinculado a outro plano | `409 Conflict` — pedido não pode estar em dois planos | `tests/plano.service.test.js` |
 | Pedidos/Planos | `POST /api/planos/:id/otimizar` | Divide os pedidos do plano em grupos sequenciais de até `tamanhoRota` (`rotaIndex`) | `tests/plano.service.test.js` |
 | Pedidos/Planos | Excluir um plano | Pedidos vinculados voltam a `planoId: null` (não são apagados) | `tests/plano.service.test.js` |
+| Pedidos/Planos | Mapa do plano otimizado: um marcador numerado por pedido e uma polyline por rota (traçado real via ORS, ou linha reta tracejada em fallback) | Reusa o mesmo `POST /api/otimizacao-rotas/otimizar` — uma chamada sequencial por grupo (`rotaIndex`), nunca em paralelo, pelo mesmo limite de requisições/minuto da ORS | Verificado manualmente (`PlanoMapa.tsx`) |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -185,6 +187,7 @@ práticas de segurança/escalabilidade:
 | Pedidos | Gerar pedidos, selecionar via checkbox (individual e "selecionar todos") e criar plano com os ids certos | `src/pages/Pedidos/index.test.tsx` |
 | Planos | Lista em cards com status/contagem; excluir (com confirmação) libera os pedidos | `src/pages/Planos/index.test.tsx` |
 | Plano detalhe | Otimizar divide os pedidos em grupos por `rotaIndex`, cada um com nome/cor/veículo derivados da posição do grupo; renomear o plano | `src/pages/PlanoDetalhe/index.test.tsx` |
+| Plano detalhe | Depois de otimizar, calcula o traçado de cada rota com uma chamada sequencial por grupo (`/otimizacao-rotas/otimizar`) e alimenta o mapa (mockado); plano Aberto não mostra mapa | `src/pages/PlanoDetalhe/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 
