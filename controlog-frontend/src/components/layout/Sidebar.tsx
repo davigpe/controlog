@@ -6,6 +6,8 @@ import {
   Users,
   MapPin,
   Route,
+  Package,
+  ClipboardList,
   BarChart2,
 } from 'lucide-react'
 
@@ -16,6 +18,8 @@ const navItems = [
   { to: '/motoristas',        icon: Users,           label: 'Motoristas'          },
   { to: '/rotas',             icon: MapPin,          label: 'Rotas'               },
   { to: '/otimizacao-rotas',  icon: Route,           label: 'Otimização de Rotas' },
+  { to: '/pedidos',           icon: Package,         label: 'Pedidos'             },
+  { to: '/planos',            icon: ClipboardList,   label: 'Planos'              },
   { to: '/relatorios',        icon: BarChart2,       label: 'Relatórios'          }, // ← corrigido
 ]
 
