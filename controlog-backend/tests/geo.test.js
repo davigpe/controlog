@@ -1,4 +1,10 @@
-import { haversineKm, nearestNeighborTour, tourDistanceKm, twoOptImprove } from '../src/utils/geo.js';
+import {
+  haversineKm,
+  nearestNeighborTour,
+  ordenarPorVarredura,
+  tourDistanceKm,
+  twoOptImprove,
+} from '../src/utils/geo.js';
 
 describe('geo', () => {
   describe('haversineKm', () => {
@@ -89,6 +95,34 @@ describe('geo', () => {
       const origem = { lat: 0, lng: 0 };
       const a = { id: 'a', lat: 1, lng: 1 };
       expect(twoOptImprove(origem, [a])).toEqual([a]);
+    });
+  });
+
+  describe('ordenarPorVarredura', () => {
+    test('ordena os pontos pelo ângulo em volta da origem, não pela ordem recebida', () => {
+      const origem = { lat: 0, lng: 0 };
+      const norte = { id: 'norte', lat: 1, lng: 0 };
+      const oeste = { id: 'oeste', lat: 0, lng: -1 };
+      const sul = { id: 'sul', lat: -1, lng: 0 };
+      const leste = { id: 'leste', lat: 0, lng: 1 };
+      const nordeste = { id: 'nordeste', lat: 0.5, lng: 0.5 };
+
+      const ordem = ordenarPorVarredura(origem, [norte, oeste, sul, leste, nordeste]);
+
+      expect(ordem.map((p) => p.id)).toEqual(['sul', 'leste', 'nordeste', 'norte', 'oeste']);
+    });
+
+    test('não muta a lista recebida', () => {
+      const origem = { lat: 0, lng: 0 };
+      const pontos = [
+        { id: 'a', lat: 1, lng: 0 },
+        { id: 'b', lat: -1, lng: 0 },
+      ];
+      const copia = [...pontos];
+
+      ordenarPorVarredura(origem, pontos);
+
+      expect(pontos).toEqual(copia);
     });
   });
 });

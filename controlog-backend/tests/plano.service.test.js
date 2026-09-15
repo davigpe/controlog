@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { createPlanoService } from '../src/services/plano.service.js';
+import { createPlanoService, DEPOSITO } from '../src/services/plano.service.js';
 import { ConflictError, NotFoundError, ValidationError } from '../src/utils/AppError.js';
 
 function buildPrismaMock() {
@@ -70,26 +70,36 @@ describe('plano.service — create', () => {
 });
 
 describe('plano.service — otimizar', () => {
-  function pedidosFake(n) {
-    return Array.from({ length: n }, (_, i) => ({ id: `p${i + 1}` }));
+  // Pedidos fictícios em cruz ao redor do depósito, deliberadamente fora de
+  // ordem angular — a varredura precisa reordenar por geografia, não repetir
+  // a ordem de entrada.
+  function pedidosEmCruz() {
+    return [
+      { id: 'p1', lat: DEPOSITO.lat + 0.02, lng: DEPOSITO.lng }, // norte
+      { id: 'p2', lat: DEPOSITO.lat, lng: DEPOSITO.lng - 0.02 }, // oeste
+      { id: 'p3', lat: DEPOSITO.lat - 0.02, lng: DEPOSITO.lng }, // sul
+      { id: 'p4', lat: DEPOSITO.lat, lng: DEPOSITO.lng + 0.02 }, // leste
+      { id: 'p5', lat: DEPOSITO.lat + 0.01, lng: DEPOSITO.lng + 0.01 }, // nordeste
+    ];
   }
 
-  test('divide os pedidos em grupos sequenciais de tamanhoRota', async () => {
+  test('divide os pedidos em grupos de tamanhoRota seguindo a varredura geográfica, não a ordem de entrada', async () => {
     const prisma = buildPrismaMock();
     prisma.plano.findUnique
-      .mockResolvedValueOnce({ id: 'plano1', pedidos: pedidosFake(5) })
-      .mockResolvedValueOnce({ id: 'plano1', pedidos: pedidosFake(5) }); // segunda chamada: getById no final
+      .mockResolvedValueOnce({ id: 'plano1', pedidos: pedidosEmCruz() })
+      .mockResolvedValueOnce({ id: 'plano1', pedidos: pedidosEmCruz() }); // segunda chamada: getById no final
 
     const service = createPlanoService(prisma);
     await service.otimizar('plano1', { tamanhoRota: 2 });
 
+    // Ordem angular esperada a partir do depósito: sul, leste, nordeste, norte, oeste.
     const chamadas = prisma._tx.pedido.update.mock.calls.map(([args]) => args);
     expect(chamadas).toEqual([
-      { where: { id: 'p1' }, data: { rotaIndex: 1 } },
-      { where: { id: 'p2' }, data: { rotaIndex: 1 } },
-      { where: { id: 'p3' }, data: { rotaIndex: 2 } },
-      { where: { id: 'p4' }, data: { rotaIndex: 2 } },
-      { where: { id: 'p5' }, data: { rotaIndex: 3 } },
+      { where: { id: 'p3' }, data: { rotaIndex: 1 } },
+      { where: { id: 'p4' }, data: { rotaIndex: 1 } },
+      { where: { id: 'p5' }, data: { rotaIndex: 2 } },
+      { where: { id: 'p1' }, data: { rotaIndex: 2 } },
+      { where: { id: 'p2' }, data: { rotaIndex: 3 } },
     ]);
     expect(prisma._tx.plano.update).toHaveBeenCalledWith({
       where: { id: 'plano1' },

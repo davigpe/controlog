@@ -54,6 +54,21 @@ export function nearestNeighborTour(origem, pontos) {
   return ordem;
 }
 
+// Ordena os pontos pelo ângulo polar em volta de uma origem — algoritmo de
+// varredura ("sweep", Gillett & Miller, 1974). Pontos angularmente próximos
+// ficam adjacentes na lista, então cortar essa lista em fatias sequenciais
+// produz grupos geograficamente coerentes (fatias de "pizza" a partir da
+// origem), em vez de agrupar pontos espalhados pela cidade inteira.
+export function ordenarPorVarredura(origem, pontos) {
+  const fatorLongitude = Math.cos(toRad(origem.lat));
+
+  function angulo(ponto) {
+    return Math.atan2(ponto.lat - origem.lat, (ponto.lng - origem.lng) * fatorLongitude);
+  }
+
+  return [...pontos].sort((a, b) => angulo(a) - angulo(b));
+}
+
 // Melhoria local 2-opt sobre um trajeto de ida: tenta inverter cada segmento
 // [i, j] e mantém a troca só quando reduz a distância total. Convergência
 // garantida (só aceita trocas melhores), com um teto de iterações por segurança.

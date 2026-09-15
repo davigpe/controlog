@@ -72,7 +72,7 @@ de uma mesma rede por causa de uma única tentativa.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 136 testes em 18 suítes — **94,6% statements**, **92,7% funções**, **76,1% branches**.
+- **Backend:** 138 testes em 18 suítes — **94,65% statements**, **92,8% funções**, **76,1% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
 - **Frontend:** 158 testes em 28 suítes — **80,4% statements**, **74,3% funções**, **76,5% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
@@ -142,7 +142,7 @@ práticas de segurança/escalabilidade:
 | Pedidos/Planos | `POST /api/pedidos/gerar` | Cria e persiste a quantidade pedida, com código único por pedido | `tests/pedido.service.test.js` |
 | Pedidos/Planos | `GET /api/pedidos?disponivel=true` | Filtra só pedidos com `planoId` nulo | `tests/pedido.service.test.js` |
 | Pedidos/Planos | Criar plano com pedido já vinculado a outro plano | `409 Conflict` — pedido não pode estar em dois planos | `tests/plano.service.test.js` |
-| Pedidos/Planos | `POST /api/planos/:id/otimizar` | Divide os pedidos do plano em grupos sequenciais de até `tamanhoRota` (`rotaIndex`) | `tests/plano.service.test.js` |
+| Pedidos/Planos | `POST /api/planos/:id/otimizar` | Ordena os pedidos por varredura geográfica (`ordenarPorVarredura`, ângulo em volta do depósito) e só então divide em grupos sequenciais de até `tamanhoRota` (`rotaIndex`) — cada rota cobre uma região compacta, em vez de seguir a ordem de criação do pedido | `tests/plano.service.test.js`, `tests/geo.test.js` |
 | Pedidos/Planos | Excluir um plano | Pedidos vinculados voltam a `planoId: null` (não são apagados) | `tests/plano.service.test.js` |
 | Pedidos/Planos | Mapa do plano otimizado: um marcador numerado por pedido e uma polyline por rota (traçado real via ORS, ou linha reta tracejada em fallback) | Reusa o mesmo `POST /api/otimizacao-rotas/otimizar` — uma chamada sequencial por grupo (`rotaIndex`), nunca em paralelo, pelo mesmo limite de requisições/minuto da ORS | Verificado manualmente (`PlanoMapa.tsx`) |
 

@@ -1,5 +1,10 @@
 import { ConflictError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { ordenarPorVarredura } from '../utils/geo.js';
 import { paginationArgs, paginationMeta } from '../utils/pagination.js';
+
+// Mesma coordenada do Centro de Distribuição simulado usada em toda a
+// aplicação (controlog-frontend/src/pages/OtimizacaoRotas/gerarPedidos.ts).
+export const DEPOSITO = { lat: -26.3045, lng: -48.8487 };
 
 function toResumo(plano) {
   return {
@@ -67,17 +72,23 @@ export function createPlanoService(prisma) {
     async otimizar(id, { tamanhoRota }) {
       const plano = await prisma.plano.findUnique({
         where: { id },
-        include: { pedidos: { orderBy: { criadoEm: 'asc' } } },
+        include: { pedidos: true },
       });
       if (!plano) throw new NotFoundError('Plano não encontrado.');
       if (plano.pedidos.length === 0) {
         throw new ValidationError('Este plano não tem nenhum pedido pra otimizar.');
       }
 
+      // Varredura geográfica antes de cortar em fatias de tamanhoRota — sem
+      // isso, o corte seguiria a ordem de criação dos pedidos e cada rota
+      // acabaria espalhada pela cidade inteira em vez de cobrir uma região
+      // compacta.
+      const ordemGeografica = ordenarPorVarredura(DEPOSITO, plano.pedidos);
+
       await prisma.$transaction(async (tx) => {
-        for (let i = 0; i < plano.pedidos.length; i++) {
+        for (let i = 0; i < ordemGeografica.length; i++) {
           const rotaIndex = Math.floor(i / tamanhoRota) + 1;
-          await tx.pedido.update({ where: { id: plano.pedidos[i].id }, data: { rotaIndex } });
+          await tx.pedido.update({ where: { id: ordemGeografica[i].id }, data: { rotaIndex } });
         }
         await tx.plano.update({ where: { id }, data: { status: 'OTIMIZADO' } });
       });
