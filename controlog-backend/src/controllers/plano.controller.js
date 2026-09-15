@@ -27,6 +27,11 @@ export function createPlanoController(planoService) {
       res.json(plano);
     }),
 
+    aprovarRota: asyncHandler(async (req, res) => {
+      const rota = await planoService.aprovarRota(req.params.id, req.params.rotaIndex, req.body);
+      res.status(201).json(rota);
+    }),
+
     remove: asyncHandler(async (req, res) => {
       await planoService.remove(req.params.id);
       res.status(204).send();

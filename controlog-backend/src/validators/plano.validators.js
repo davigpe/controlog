@@ -15,6 +15,12 @@ export const otimizarPlanoSchema = z.object({
   tamanhoRota: z.coerce.number().int().min(1, 'Informe ao menos 1 pedido por rota.').max(50),
 });
 
+export const aprovarRotaSchema = z.object({
+  motoristaId: z.string().uuid('Selecione um motorista.'),
+  veiculoId: z.string().uuid('Selecione um veículo.'),
+  dataHora: z.coerce.date({ errorMap: () => ({ message: 'Data/hora inválida.' }) }),
+});
+
 export const listPlanosQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),

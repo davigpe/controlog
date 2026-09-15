@@ -1,4 +1,5 @@
 import { ConflictError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { proximoCodigoSequencial } from '../utils/codigoSequencial.js';
 import { ordenarPorVarredura } from '../utils/geo.js';
 import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 
@@ -34,7 +35,12 @@ export function createPlanoService(prisma) {
     async getById(id) {
       const plano = await prisma.plano.findUnique({
         where: { id },
-        include: { pedidos: { orderBy: [{ rotaIndex: 'asc' }, { criadoEm: 'asc' }] } },
+        include: {
+          pedidos: {
+            orderBy: [{ rotaIndex: 'asc' }, { criadoEm: 'asc' }],
+            include: { rota: { select: { codigo: true } } },
+          },
+        },
       });
       if (!plano) throw new NotFoundError('Plano não encontrado.');
       return plano;
@@ -94,6 +100,101 @@ export function createPlanoService(prisma) {
       });
 
       return this.getById(id);
+    },
+
+    // Promove um grupo (rotaIndex) já otimizado a uma Rota real: cria a
+    // Rota com um código sequencial RT-XXX, marca os pedidos do grupo como
+    // aprovados (Pedido.rotaId) e cria uma Entrega por pedido — a partir
+    // daqui a rota aparece na página real de Rotas e entra nos agregados
+    // de Dashboard/Relatórios, igual a qualquer rota cadastrada na mão.
+    async aprovarRota(planoId, rotaIndex, { motoristaId, veiculoId, dataHora }) {
+      const indice = Number(rotaIndex);
+      if (!Number.isInteger(indice) || indice < 1) {
+        throw new ValidationError('rotaIndex inválido.');
+      }
+
+      const plano = await prisma.plano.findUnique({ where: { id: planoId } });
+      if (!plano) throw new NotFoundError('Plano não encontrado.');
+      if (plano.status !== 'OTIMIZADO') {
+        throw new ValidationError('Otimize o plano antes de aprovar uma de suas rotas.');
+      }
+
+      const pedidosDoGrupo = await prisma.pedido.findMany({
+        where: { planoId, rotaIndex: indice },
+      });
+      if (pedidosDoGrupo.length === 0) {
+        throw new NotFoundError(`Rota ${indice} não encontrada neste plano.`);
+      }
+      if (pedidosDoGrupo.some((p) => p.rotaId !== null)) {
+        throw new ConflictError(`A Rota ${indice} deste plano já foi aprovada.`);
+      }
+
+      const [motorista, veiculo] = await Promise.all([
+        prisma.motorista.findUnique({ where: { id: motoristaId } }),
+        prisma.veiculo.findUnique({ where: { id: veiculoId } }),
+      ]);
+      if (!motorista) throw new ValidationError('Motorista informado não existe.');
+      if (!veiculo) throw new ValidationError('Veículo informado não existe.');
+
+      const cidades = [...new Set(pedidosDoGrupo.map((p) => p.cidade))];
+      const latDestino = pedidosDoGrupo.reduce((soma, p) => soma + p.lat, 0) / pedidosDoGrupo.length;
+      const lngDestino = pedidosDoGrupo.reduce((soma, p) => soma + p.lng, 0) / pedidosDoGrupo.length;
+
+      return prisma.$transaction(async (tx) => {
+        const codigosRota = await tx.rota.findMany({
+          where: { codigo: { startsWith: 'RT-' } },
+          select: { codigo: true },
+        });
+        const codigoRota = proximoCodigoSequencial(
+          codigosRota.map((r) => r.codigo),
+          'RT-'
+        );
+
+        const rota = await tx.rota.create({
+          data: {
+            codigo: codigoRota,
+            origem: 'Centro de Distribuição',
+            destino: cidades.join(', '),
+            latOrigem: DEPOSITO.lat,
+            lngOrigem: DEPOSITO.lng,
+            latDestino,
+            lngDestino,
+            status: 'ATIVA',
+            dataHora,
+            motoristaId,
+            veiculoId,
+          },
+        });
+
+        await tx.pedido.updateMany({
+          where: { planoId, rotaIndex: indice },
+          data: { rotaId: rota.id },
+        });
+
+        const codigosEntrega = await tx.entrega.findMany({
+          where: { codigo: { startsWith: 'EN-' } },
+          select: { codigo: true },
+        });
+        let proximoCodigoEntrega = proximoCodigoSequencial(
+          codigosEntrega.map((e) => e.codigo),
+          'EN-'
+        );
+        for (const pedido of pedidosDoGrupo) {
+          await tx.entrega.create({
+            data: {
+              codigo: proximoCodigoEntrega,
+              destino: `${pedido.endereco}, ${pedido.cidade}`,
+              status: 'PENDENTE',
+              dataPrevista: dataHora,
+              rotaId: rota.id,
+              motoristaId,
+            },
+          });
+          proximoCodigoEntrega = proximoCodigoSequencial([proximoCodigoEntrega], 'EN-');
+        }
+
+        return rota;
+      });
     },
 
     async remove(id) {
