@@ -37,7 +37,12 @@ function resultadoOtimizacaoFake(pedidos: { id: string }[]) {
   };
 }
 
-function pedido(id: string, codigo: string, rotaIndex: number | null = null) {
+function pedido(
+  id: string,
+  codigo: string,
+  rotaIndex: number | null = null,
+  rota: { codigo: string } | null = null
+) {
   return {
     id,
     codigo,
@@ -51,6 +56,7 @@ function pedido(id: string, codigo: string, rotaIndex: number | null = null) {
     criadoEm: new Date().toISOString(),
     planoId: 'plano1',
     rotaIndex,
+    rota,
   };
 }
 
@@ -152,6 +158,45 @@ describe('PlanoDetalhe', () => {
     expect(chamadasOtimizarRota).toHaveLength(2);
     expect(chamadasOtimizarRota[0][1]).toMatchObject({ pedidos: [{ id: 'p1' }, { id: 'p2' }] });
     expect(chamadasOtimizarRota[1][1]).toMatchObject({ pedidos: [{ id: 'p3' }] });
+  });
+
+  test('grupo já aprovado mostra o código da rota real; grupo pendente mostra o botão de aprovar', async () => {
+    const planoComUmaRotaAprovada = {
+      ...planoAberto(),
+      status: 'OTIMIZADO' as const,
+      pedidos: [
+        pedido('p1', 'PED-001', 1, { codigo: 'RT-005' }),
+        pedido('p2', 'PED-002', 1, { codigo: 'RT-005' }),
+        pedido('p3', 'PED-003', 2),
+      ],
+    };
+    mockedApi.get.mockResolvedValue({ data: planoComUmaRotaAprovada });
+    mockedApi.post.mockResolvedValue({ data: resultadoOtimizacaoFake([]) });
+    renderPlano();
+
+    await screen.findByText('Rota 1');
+    expect(screen.getByText('Aprovada — RT-005')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aprovar Rota' })).toBeInTheDocument();
+  });
+
+  test('clicar em Aprovar Rota abre o modal de aprovação com o grupo certo', async () => {
+    const user = userEvent.setup();
+    const planoOtimizado = {
+      ...planoAberto(),
+      status: 'OTIMIZADO' as const,
+      pedidos: [pedido('p1', 'PED-001', 1), pedido('p2', 'PED-002', 1)],
+    };
+    mockedApi.get.mockImplementation((url: string) => {
+      if (url === '/planos/plano1') return Promise.resolve({ data: planoOtimizado });
+      return Promise.resolve({ data: { items: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } } });
+    });
+    renderPlano();
+    await screen.findByText('Rota 1');
+
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Aprovar Rota 1' })).toBeInTheDocument();
+    expect(screen.getByText('2 pedido(s) vão virar uma rota real, com uma entrega vinculada pra cada um.')).toBeInTheDocument();
   });
 
   test('plano Aberto não mostra o mapa de rotas', async () => {

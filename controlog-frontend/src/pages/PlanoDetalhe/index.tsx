@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Pencil, Route as RouteIcon } from 'lucide-react';
+import { CheckCircle2, Pencil, Route as RouteIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,12 @@ import { useOtimizarRota } from '@/pages/OtimizacaoRotas/api';
 import { DEPOSITO } from '@/pages/OtimizacaoRotas/gerarPedidos';
 import { PALETA_CORES, TIPOS_VEICULO } from '@/pages/OtimizacaoRotas/rotasSimuladas';
 import type { ResultadoOtimizacao } from '@/pages/OtimizacaoRotas/types';
-import type { Pedido } from '@/pages/Pedidos/types';
 import type { StatusPlano } from '@/pages/Planos/types';
-import { useOtimizarPlano, usePlano, useRenomearPlano } from './api';
+import { useAprovarRota, useOtimizarPlano, usePlano, useRenomearPlano } from './api';
+import AprovarRotaModal from './AprovarRotaModal';
 import PlanoMapa, { type GrupoNoMapa } from './PlanoMapa';
 import RenomearPlanoModal from './RenomearPlanoModal';
+import type { PedidoDoPlano } from './types';
 
 const TAMANHO_ROTA_PADRAO = 10;
 
@@ -39,7 +40,7 @@ function veiculoDoGrupo(indice: number) {
   return `${tipo} ${String(indice + 1).padStart(2, '0')}`;
 }
 
-function TabelaPedidos({ pedidos }: { pedidos: Pedido[] }) {
+function TabelaPedidos({ pedidos }: { pedidos: PedidoDoPlano[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
@@ -79,13 +80,15 @@ export default function PlanoDetalhe() {
   const otimizarMutation = useOtimizarPlano(id ?? '');
   const renomearMutation = useRenomearPlano(id ?? '');
   const otimizarRotaMutation = useOtimizarRota();
+  const aprovarRotaMutation = useAprovarRota(id ?? '');
 
   const [resultadosPorGrupo, setResultadosPorGrupo] = useState<Record<number, ResultadoOtimizacao | null>>({});
   const [statusPorGrupo, setStatusPorGrupo] = useState<Record<number, 'calculando' | 'calculada' | 'erro'>>({});
+  const [aprovando, setAprovando] = useState<number | null>(null);
 
   const grupos = useMemo(() => {
     if (!plano || plano.status !== 'OTIMIZADO') return null;
-    const mapa = new Map<number, Pedido[]>();
+    const mapa = new Map<number, PedidoDoPlano[]>();
     for (const pedido of plano.pedidos) {
       const indice = pedido.rotaIndex ?? 0;
       mapa.set(indice, [...(mapa.get(indice) ?? []), pedido]);
@@ -156,6 +159,22 @@ export default function PlanoDetalhe() {
       onError: (error) => toast.error(getErrorMessage(error, 'Não foi possível renomear o plano.')),
     });
   }
+
+  function handleAprovarRota(dados: { motoristaId: string; veiculoId: string; dataHora: string }) {
+    if (aprovando === null) return;
+    aprovarRotaMutation.mutate(
+      { rotaIndex: aprovando, ...dados },
+      {
+        onSuccess: (rota) => {
+          toast.success(`Rota aprovada como ${rota.codigo}.`);
+          setAprovando(null);
+        },
+        onError: (error) => toast.error(getErrorMessage(error, 'Não foi possível aprovar esta rota.')),
+      }
+    );
+  }
+
+  const pedidosDoGrupoEmAprovacao = grupos?.find(([indice]) => indice === aprovando)?.[1] ?? [];
 
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Carregando plano...</div>;
@@ -228,22 +247,37 @@ export default function PlanoDetalhe() {
         </div>
       ) : grupos ? (
         <div className="space-y-4">
-          {grupos.map(([indice, pedidosDoGrupo]) => (
-            <div key={indice} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: corDoGrupo(indice - 1) }}
-                  aria-hidden="true"
-                />
-                <h2 className="font-semibold text-sm">Rota {indice}</h2>
-                <span className="text-xs text-muted-foreground">
-                  {veiculoDoGrupo(indice - 1)} · {pedidosDoGrupo.length} pedido(s)
-                </span>
+          {grupos.map(([indice, pedidosDoGrupo]) => {
+            const codigoAprovado = pedidosDoGrupo[0]?.rota?.codigo ?? null;
+            return (
+              <div key={indice} className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: corDoGrupo(indice - 1) }}
+                    aria-hidden="true"
+                  />
+                  <h2 className="font-semibold text-sm">Rota {indice}</h2>
+                  <span className="text-xs text-muted-foreground">
+                    {veiculoDoGrupo(indice - 1)} · {pedidosDoGrupo.length} pedido(s)
+                  </span>
+                  <div className="ml-auto">
+                    {codigoAprovado ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Aprovada — {codigoAprovado}
+                      </span>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" onClick={() => setAprovando(indice)}>
+                        Aprovar Rota
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <TabelaPedidos pedidos={pedidosDoGrupo} />
               </div>
-              <TabelaPedidos pedidos={pedidosDoGrupo} />
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <TabelaPedidos pedidos={plano.pedidos} />
@@ -255,6 +289,15 @@ export default function PlanoDetalhe() {
         saving={renomearMutation.isPending}
         onSalvar={handleRenomear}
         onFechar={() => setRenomeando(false)}
+      />
+
+      <AprovarRotaModal
+        open={aprovando !== null}
+        rotaIndice={aprovando ?? 0}
+        totalPedidos={pedidosDoGrupoEmAprovacao.length}
+        saving={aprovarRotaMutation.isPending}
+        onConfirmar={handleAprovarRota}
+        onFechar={() => setAprovando(null)}
       />
     </div>
   );

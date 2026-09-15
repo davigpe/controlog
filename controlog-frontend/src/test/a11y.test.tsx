@@ -143,6 +143,46 @@ describe('acessibilidade (regressão estrutural)', () => {
     await expect(axe(container)).resolves.toHaveNoViolations();
   });
 
+  test('Modal de aprovar rota não tem violações de acessibilidade', async () => {
+    const user = userEvent.setup();
+    const planoOtimizado = {
+      id: 'plano1',
+      nome: 'Plano Teste',
+      status: 'OTIMIZADO',
+      criadoEm: new Date().toISOString(),
+      pedidos: [
+        {
+          id: 'p1',
+          codigo: 'PED-001',
+          cliente: 'Cliente',
+          endereco: 'Rua A, 1',
+          cidade: 'Centro',
+          lat: -26.3,
+          lng: -48.8,
+          unidades: 1,
+          volumeM3: 0.1,
+          criadoEm: new Date().toISOString(),
+          planoId: 'plano1',
+          rotaIndex: 1,
+          rota: null,
+        },
+      ],
+    };
+    mockedApi.get.mockImplementation((url: string) => {
+      if (url === '/planos/plano1') return Promise.resolve({ data: planoOtimizado });
+      return Promise.resolve({ data: paginated([]) });
+    });
+    const { container, findByRole } = renderWithProviders(
+      <Routes>
+        <Route path="/planos/:id" element={<PlanoDetalhe />} />
+      </Routes>,
+      { route: '/planos/plano1' }
+    );
+    await user.click(await findByRole('button', { name: 'Aprovar Rota' }));
+    await findByRole('dialog');
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
   test('Relatórios não tem violações de acessibilidade', async () => {
     mockedApi.get.mockResolvedValue({
       data: { periodo: { dataInicio: null, dataFim: null }, rotasPorStatus: {}, entregasPorStatus: {}, totalEntregas: 0, motoristasMaisAtivos: [] },
