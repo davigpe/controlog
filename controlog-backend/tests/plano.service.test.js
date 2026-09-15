@@ -6,6 +6,8 @@ function buildPrismaMock() {
   const tx = {
     plano: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     pedido: { updateMany: jest.fn(), update: jest.fn() },
+    rota: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+    entrega: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
   };
 
   return {
@@ -16,6 +18,8 @@ function buildPrismaMock() {
       delete: jest.fn(),
     },
     pedido: { findMany: jest.fn() },
+    motorista: { findUnique: jest.fn() },
+    veiculo: { findUnique: jest.fn() },
     $transaction: jest.fn(async (fn) => fn(tx)),
     _tx: tx,
   };
@@ -128,6 +132,131 @@ describe('plano.service — otimizar', () => {
     await expect(service.otimizar('inexistente', { tamanhoRota: 3 })).rejects.toBeInstanceOf(
       NotFoundError
     );
+  });
+});
+
+describe('plano.service — aprovarRota', () => {
+  function pedidosDoGrupo() {
+    return [
+      { id: 'p1', codigo: 'PED-1', endereco: 'Rua A, 1', cidade: 'Centro', lat: -26.3, lng: -48.84, rotaId: null },
+      { id: 'p2', codigo: 'PED-2', endereco: 'Rua B, 2', cidade: 'Bucarein', lat: -26.32, lng: -48.86, rotaId: null },
+    ];
+  }
+
+  const payload = { motoristaId: 'm1', veiculoId: 'v1', dataHora: new Date('2026-01-10T10:00:00Z') };
+
+  test('cria a Rota com o próximo código, aprova os pedidos e gera uma Entrega por pedido', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'OTIMIZADO' });
+    prisma.pedido.findMany.mockResolvedValue(pedidosDoGrupo());
+    prisma.motorista.findUnique.mockResolvedValue({ id: 'm1' });
+    prisma.veiculo.findUnique.mockResolvedValue({ id: 'v1' });
+    prisma._tx.rota.findMany.mockResolvedValue([{ codigo: 'RT-001' }]);
+    prisma._tx.rota.create.mockResolvedValue({ id: 'rota1', codigo: 'RT-002' });
+
+    const service = createPlanoService(prisma);
+    const resultado = await service.aprovarRota('plano1', '1', payload);
+
+    expect(resultado).toEqual({ id: 'rota1', codigo: 'RT-002' });
+    const dadosRota = prisma._tx.rota.create.mock.calls[0][0].data;
+    expect(dadosRota).toMatchObject({
+      codigo: 'RT-002',
+      origem: 'Centro de Distribuição',
+      destino: 'Centro, Bucarein',
+      latOrigem: -26.3045,
+      lngOrigem: -48.8487,
+      status: 'ATIVA',
+      dataHora: payload.dataHora,
+      motoristaId: 'm1',
+      veiculoId: 'v1',
+    });
+    expect(dadosRota.latDestino).toBeCloseTo(-26.31, 9);
+    expect(dadosRota.lngDestino).toBeCloseTo(-48.85, 9);
+    expect(prisma._tx.pedido.updateMany).toHaveBeenCalledWith({
+      where: { planoId: 'plano1', rotaIndex: 1 },
+      data: { rotaId: 'rota1' },
+    });
+    expect(prisma._tx.entrega.create).toHaveBeenCalledTimes(2);
+    expect(prisma._tx.entrega.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        codigo: 'EN-001',
+        destino: 'Rua A, 1, Centro',
+        status: 'PENDENTE',
+        dataPrevista: payload.dataHora,
+        rotaId: 'rota1',
+        motoristaId: 'm1',
+      },
+    });
+    expect(prisma._tx.entrega.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        codigo: 'EN-002',
+        destino: 'Rua B, 2, Bucarein',
+        status: 'PENDENTE',
+        dataPrevista: payload.dataHora,
+        rotaId: 'rota1',
+        motoristaId: 'm1',
+      },
+    });
+  });
+
+  test('rejeita plano inexistente', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue(null);
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('inexistente', '1', payload)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test('rejeita aprovar rota de um plano ainda não otimizado', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'ABERTO' });
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('plano1', '1', payload)).rejects.toBeInstanceOf(ValidationError);
+    expect(prisma.pedido.findMany).not.toHaveBeenCalled();
+  });
+
+  test('rejeita quando o grupo (rotaIndex) não existe no plano', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'OTIMIZADO' });
+    prisma.pedido.findMany.mockResolvedValue([]);
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('plano1', '9', payload)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  test('rejeita reaprovar uma rota já aprovada', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'OTIMIZADO' });
+    prisma.pedido.findMany.mockResolvedValue([{ ...pedidosDoGrupo()[0], rotaId: 'rota-ja-existente' }]);
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('plano1', '1', payload)).rejects.toBeInstanceOf(ConflictError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test('rejeita motorista inexistente', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'OTIMIZADO' });
+    prisma.pedido.findMany.mockResolvedValue(pedidosDoGrupo());
+    prisma.motorista.findUnique.mockResolvedValue(null);
+    prisma.veiculo.findUnique.mockResolvedValue({ id: 'v1' });
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('plano1', '1', payload)).rejects.toBeInstanceOf(ValidationError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test('rejeita veículo inexistente', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', status: 'OTIMIZADO' });
+    prisma.pedido.findMany.mockResolvedValue(pedidosDoGrupo());
+    prisma.motorista.findUnique.mockResolvedValue({ id: 'm1' });
+    prisma.veiculo.findUnique.mockResolvedValue(null);
+
+    const service = createPlanoService(prisma);
+    await expect(service.aprovarRota('plano1', '1', payload)).rejects.toBeInstanceOf(ValidationError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
 

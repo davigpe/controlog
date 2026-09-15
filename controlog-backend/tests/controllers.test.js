@@ -318,6 +318,21 @@ describe('plano.controller', () => {
     expect(res.json).toHaveBeenCalledWith(plano);
   });
 
+  test('aprovarRota responde 201 com a rota criada', async () => {
+    const rota = { id: 'rota1', codigo: 'RT-002' };
+    const service = { aprovarRota: jest.fn().mockResolvedValue(rota) };
+    const controller = createPlanoController(service);
+    const body = { motoristaId: 'm1', veiculoId: 'v1', dataHora: new Date() };
+    const req = { params: { id: 'plano1', rotaIndex: '1' }, body };
+    const res = buildRes();
+
+    await controller.aprovarRota(req, res, jest.fn());
+
+    expect(service.aprovarRota).toHaveBeenCalledWith('plano1', '1', body);
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(rota);
+  });
+
   test('remove responde 204', async () => {
     const service = { remove: jest.fn().mockResolvedValue(undefined) };
     const controller = createPlanoController(service);

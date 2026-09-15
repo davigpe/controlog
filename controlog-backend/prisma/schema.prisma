@@ -105,6 +105,7 @@ model Rota {
   veiculo   Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
 
   entregas Entrega[]
+  pedidos  Pedido[]
 
   @@map("rotas")
 }
@@ -157,6 +158,11 @@ model Pedido {
   plano     Plano?   @relation(fields: [planoId], references: [id], onDelete: SetNull)
   // Grupo (1, 2, 3...) atribuído ao otimizar o plano — null até otimizar.
   rotaIndex Int?     @map("rota_index")
+
+  // Preenchido quando o grupo (rotaIndex) é aprovado e vira uma Rota real —
+  // null enquanto o grupo ainda não foi aprovado.
+  rotaId String? @map("rota_id")
+  rota   Rota?   @relation(fields: [rotaId], references: [id], onDelete: SetNull)
 
   @@map("pedidos")
 }
