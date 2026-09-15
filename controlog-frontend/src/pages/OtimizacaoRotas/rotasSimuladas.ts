@@ -19,7 +19,7 @@ export interface RotaSimulada {
   status: StatusRotaSimulada;
 }
 
-const PALETA_CORES = [
+export const PALETA_CORES = [
   '#2563eb', // azul
   '#dc2626', // vermelho
   '#16a34a', // verde
@@ -32,7 +32,7 @@ const PALETA_CORES = [
   '#b45309', // âmbar escuro
 ];
 
-const TIPOS_VEICULO = ['Van', 'VUC', 'Fiorino', 'Caminhão 3/4'];
+export const TIPOS_VEICULO = ['Van', 'VUC', 'Fiorino', 'Caminhão 3/4'];
 
 export function proximaCor(rotasExistentes: RotaSimulada[]): string {
   return PALETA_CORES[rotasExistentes.length % PALETA_CORES.length];
