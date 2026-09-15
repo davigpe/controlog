@@ -110,6 +110,8 @@ Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GES
 | Dashboard | `GET /api/dashboard/resumo` |
 | Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...` |
 | Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` |
+| Pedidos | `GET /api/pedidos?disponivel=true`, `POST /api/pedidos/gerar` |
+| Planos | `GET/POST /api/planos`, `GET/PUT/DELETE /api/planos/:id`, `POST /api/planos/:id/otimizar` |
 
 `POST /api/otimizacao-rotas/otimizar` recebe `{ origem: {lat,lng}, pedidos: [{id,lat,lng,endereco?}] }`
 (1 a 50 pedidos) e devolve a melhor ordem de visita (trajeto só de ida, sem voltar à
@@ -124,6 +126,15 @@ a partir da ordem já otimizada. Precisa da variável de ambiente `ORS_API_KEY`;
 (ou se a chamada falhar/expirar/atingir o limite de requisições), `rotaReal` vem `null`
 e o frontend cai de volta pra desenhar a linha reta entre as paradas — a otimização em
 si nunca depende desse serviço externo.
+
+`POST /api/pedidos/gerar` cria e persiste `{ quantidade }` pedidos fictícios (endereço/
+unidades/volume aleatórios, mesmos bairros de Joinville usados na Otimização de Rotas).
+`POST /api/planos` recebe `{ nome, pedidoIds }` e vincula esses pedidos ao plano — rejeita
+com `409` se algum já pertencer a outro plano (um pedido só pode estar em um plano por
+vez). `POST /api/planos/:id/otimizar` recebe `{ tamanhoRota }` e divide os pedidos do
+plano em grupos sequenciais de até esse tamanho (grava em `rotaIndex`) — é só
+distribuição por tamanho, sem geometria nenhuma, diferente da Otimização de Rotas.
+Excluir um plano libera os pedidos de volta (`planoId` volta a `null`), não os apaga.
 
 Os endpoints de listagem (`GET /api/motoristas`, `/veiculos`, `/rotas`, `/entregas`) aceitam
 paginação via `?page=1&pageSize=10` (`pageSize` máximo 100) e retornam
