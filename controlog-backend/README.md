@@ -111,7 +111,7 @@ Perfis de usuário: `GESTOR`, `OPERADOR`, `MOTORISTA`. Elevar um usuário a `GES
 | Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...` |
 | Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` |
 | Pedidos | `GET /api/pedidos?disponivel=true`, `POST /api/pedidos/gerar` |
-| Planos | `GET/POST /api/planos`, `GET/PUT/DELETE /api/planos/:id`, `POST /api/planos/:id/otimizar` |
+| Planos | `GET/POST /api/planos`, `GET/PUT/DELETE /api/planos/:id`, `POST /api/planos/:id/otimizar`, `POST /api/planos/:id/rotas/:rotaIndex/aprovar` |
 
 `POST /api/otimizacao-rotas/otimizar` recebe `{ origem: {lat,lng}, pedidos: [{id,lat,lng,endereco?}] }`
 (1 a 50 pedidos) e devolve a melhor ordem de visita (trajeto só de ida, sem voltar à
@@ -135,6 +135,16 @@ vez). `POST /api/planos/:id/otimizar` recebe `{ tamanhoRota }` e divide os pedid
 plano em grupos sequenciais de até esse tamanho (grava em `rotaIndex`) — é só
 distribuição por tamanho, sem geometria nenhuma, diferente da Otimização de Rotas.
 Excluir um plano libera os pedidos de volta (`planoId` volta a `null`), não os apaga.
+
+`POST /api/planos/:id/rotas/:rotaIndex/aprovar` recebe `{ motoristaId, veiculoId,
+dataHora }` e promove um grupo (`rotaIndex`) já otimizado a uma `Rota` de verdade: gera
+um código sequencial `RT-XXX`, marca os pedidos do grupo como aprovados (`Pedido.rotaId`)
+e cria uma `Entrega` real por pedido, vinculada a essa rota — a partir daí a rota aparece
+na listagem real de `/api/rotas` e entra nos agregados de Dashboard/Relatórios, igual a
+qualquer rota cadastrada manualmente. Rejeita com `409` se o grupo já tiver sido aprovado
+antes (idempotência) e com `422` se o plano ainda não tiver sido otimizado. Como
+consequência, `prisma/seed.js` não semeia mais rotas/entregas fictícias — a página de
+Rotas só mostra o que foi de fato aprovado a partir de um plano.
 
 Os endpoints de listagem (`GET /api/motoristas`, `/veiculos`, `/rotas`, `/entregas`) aceitam
 paginação via `?page=1&pageSize=10` (`pageSize` máximo 100) e retornam

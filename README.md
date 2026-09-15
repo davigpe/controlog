@@ -18,7 +18,7 @@ O Controlog substitui o controle de rotas e entregas feito hoje em planilhas e W
 * Relatórios filtráveis por período, com motoristas mais ativos e distribuição por status
 * Visualização de rotas em mapa interativo (origem/destino)
 * Simulador de otimização de rotas: gera pedidos fictícios, permite selecioná-los por polígono desenhado no mapa e organizá-los em múltiplas rotas (cada uma com cor, veículo e status próprios), calcula a melhor ordem de entrega de cada rota e desenha o traçado real pelas ruas (via OpenRouteService, com fallback em linha reta)
-* Planejamento de pedidos: gera pedidos fictícios persistidos, seleciona vários de uma vez pra montar um plano nomeado, divide os pedidos do plano em rotas automaticamente por um tamanho máximo informado e exibe cada rota otimizada num mapa com o traçado real pelas ruas (mesma integração com a OpenRouteService da Otimização de Rotas)
+* Planejamento de pedidos: gera pedidos fictícios persistidos, seleciona vários de uma vez pra montar um plano nomeado, divide os pedidos do plano em rotas automaticamente por um tamanho máximo informado e exibe cada rota otimizada num mapa com o traçado real pelas ruas (mesma integração com a OpenRouteService da Otimização de Rotas); cada rota pode ser aprovada a critério do usuário, virando uma Rota real (com código sequencial RT-XXX) e uma Entrega por pedido, aparecendo na página de Rotas junto de Dashboard/Relatórios
 
 ---
 

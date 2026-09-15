@@ -72,9 +72,9 @@ de uma mesma rede por causa de uma única tentativa.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 138 testes em 18 suítes — **94,65% statements**, **92,8% funções**, **76,1% branches**.
+- **Backend:** 151 testes em 19 suítes — **94,6% statements**, **92,1% funções**, **77,4% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 158 testes em 28 suítes — **80,4% statements**, **74,3% funções**, **76,5% branches**.
+- **Frontend:** 161 testes em 28 suítes — **81,1% statements**, **74,8% funções**, **78,6% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -145,6 +145,7 @@ práticas de segurança/escalabilidade:
 | Pedidos/Planos | `POST /api/planos/:id/otimizar` | Ordena os pedidos por varredura geográfica (`ordenarPorVarredura`, ângulo em volta do depósito) e só então divide em grupos sequenciais de até `tamanhoRota` (`rotaIndex`) — cada rota cobre uma região compacta, em vez de seguir a ordem de criação do pedido | `tests/plano.service.test.js`, `tests/geo.test.js` |
 | Pedidos/Planos | Excluir um plano | Pedidos vinculados voltam a `planoId: null` (não são apagados) | `tests/plano.service.test.js` |
 | Pedidos/Planos | Mapa do plano otimizado: um marcador numerado por pedido e uma polyline por rota (traçado real via ORS, ou linha reta tracejada em fallback) | Reusa o mesmo `POST /api/otimizacao-rotas/otimizar` — uma chamada sequencial por grupo (`rotaIndex`), nunca em paralelo, pelo mesmo limite de requisições/minuto da ORS | Verificado manualmente (`PlanoMapa.tsx`) |
+| Pedidos/Planos | `POST /api/planos/:id/rotas/:rotaIndex/aprovar` | Cria uma `Rota` real com código sequencial `RT-XXX` (`proximoCodigoSequencial`), marca os pedidos do grupo como aprovados (`Pedido.rotaId`) e cria uma `Entrega` por pedido — rejeita se o plano não estiver `OTIMIZADO`, se o grupo não existir, se já tiver sido aprovado (409, idempotência) ou se motorista/veículo não existirem | `tests/plano.service.test.js`, `tests/codigoSequencial.test.js` |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -187,6 +188,7 @@ práticas de segurança/escalabilidade:
 | Pedidos | Gerar pedidos, selecionar via checkbox (individual e "selecionar todos") e criar plano com os ids certos | `src/pages/Pedidos/index.test.tsx` |
 | Planos | Lista em cards com status/contagem; excluir (com confirmação) libera os pedidos | `src/pages/Planos/index.test.tsx` |
 | Plano detalhe | Otimizar divide os pedidos em grupos por `rotaIndex`, cada um com nome/cor/veículo derivados da posição do grupo; renomear o plano | `src/pages/PlanoDetalhe/index.test.tsx` |
+| Plano detalhe | Grupo com `pedido.rota` preenchido mostra o badge "Aprovada — RT-XXX" em vez do botão; clicar em "Aprovar Rota" abre o modal com o grupo certo (seleção de motorista/veículo verificada manualmente, mesma lacuna já documentada para `RotaModal`) | `src/pages/PlanoDetalhe/index.test.tsx`, `src/test/a11y.test.tsx` |
 | Plano detalhe | Depois de otimizar, calcula o traçado de cada rota com uma chamada sequencial por grupo (`/otimizacao-rotas/otimizar`) e alimenta o mapa (mockado); plano Aberto não mostra mapa | `src/pages/PlanoDetalhe/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
