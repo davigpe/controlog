@@ -72,9 +72,9 @@ de uma mesma rede por causa de uma única tentativa.
 
 **Cobertura automatizada atual:**
 
-- **Backend:** 115 testes em 16 suítes — **95,5% statements**, **95,1% funções**, **78,1% branches**.
+- **Backend:** 136 testes em 18 suítes — **94,6% statements**, **92,7% funções**, **76,1% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 141 testes em 25 suítes — **80,4% statements**, **74,0% funções**, **78,7% branches**.
+- **Frontend:** 156 testes em 28 suítes — **81,5% statements**, **75,5% funções**, **78,1% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -138,6 +138,11 @@ práticas de segurança/escalabilidade:
 | Otimização de rotas | Traçado real: resposta válida da ORS | Converte GeoJSON em `{ pontos, distanciaRealKm, duracaoMinutos }` | `tests/roteamentoReal.service.test.js` |
 | Otimização de rotas | Seleção de pedidos por polígono (ray-casting) | Ponto dentro/fora/na borda de um polígono conhecido, inclusive côncavo | `pontoNoPoligono.test.ts` (frontend) |
 | Otimização de rotas | Criar/atribuir/desatribuir/excluir/renomear rota simulada | Mantém a invariante 1 pedido = 1 rota; `rotasAfetadas` identifica corretamente 1 ou 2 rotas afetadas por transição | `rotasSimuladas.test.ts` (frontend) |
+| Pedidos/Planos | `POST /api/pedidos/gerar` | Cria e persiste a quantidade pedida, com código único por pedido | `tests/pedido.service.test.js` |
+| Pedidos/Planos | `GET /api/pedidos?disponivel=true` | Filtra só pedidos com `planoId` nulo | `tests/pedido.service.test.js` |
+| Pedidos/Planos | Criar plano com pedido já vinculado a outro plano | `409 Conflict` — pedido não pode estar em dois planos | `tests/plano.service.test.js` |
+| Pedidos/Planos | `POST /api/planos/:id/otimizar` | Divide os pedidos do plano em grupos sequenciais de até `tamanhoRota` (`rotaIndex`) | `tests/plano.service.test.js` |
+| Pedidos/Planos | Excluir um plano | Pedidos vinculados voltam a `planoId: null` (não são apagados) | `tests/plano.service.test.js` |
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -177,6 +182,9 @@ práticas de segurança/escalabilidade:
 | Otimização de rotas | Mover pedidos entre rotas (ação de linha "Atribuir/Desatribuir pedidos" + polígono) recalcula só as rotas cujo `pedidoIds` mudou, pulando rotas vazias | `src/pages/OtimizacaoRotas/index.test.tsx` |
 | Otimização de rotas | Renomear, excluir (com confirmação) e focar/desfocar uma rota pelo clique na linha da tabela | `src/pages/OtimizacaoRotas/index.test.tsx` |
 | Otimização de rotas | Erro da API ao recalcular marca a rota como "Erro" e mostra toast, sem quebrar as demais rotas | `src/pages/OtimizacaoRotas/index.test.tsx` |
+| Pedidos | Gerar pedidos, selecionar via checkbox (individual e "selecionar todos") e criar plano com os ids certos | `src/pages/Pedidos/index.test.tsx` |
+| Planos | Lista em cards com status/contagem; excluir (com confirmação) libera os pedidos | `src/pages/Planos/index.test.tsx` |
+| Plano detalhe | Otimizar divide os pedidos em grupos por `rotaIndex`, cada um com nome/cor/veículo derivados da posição do grupo; renomear o plano | `src/pages/PlanoDetalhe/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 

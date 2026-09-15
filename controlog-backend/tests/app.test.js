@@ -23,6 +23,18 @@ describe('app', () => {
     expect(res.body.error).toBe('UnauthorizedError');
   });
 
+  test('GET /api/pedidos sem token responde 401', async () => {
+    const res = await request(app).get('/api/pedidos');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('UnauthorizedError');
+  });
+
+  test('GET /api/planos sem token responde 401', async () => {
+    const res = await request(app).get('/api/planos');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('UnauthorizedError');
+  });
+
   test('rota inexistente responde 404', async () => {
     const res = await request(app).get('/rota-que-nao-existe');
     expect(res.status).toBe(404);

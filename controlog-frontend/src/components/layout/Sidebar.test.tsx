@@ -18,6 +18,8 @@ describe('Sidebar', () => {
       'Motoristas',
       'Rotas',
       'Otimização de Rotas',
+      'Pedidos',
+      'Planos',
       'Relatórios',
     ]) {
       // Âncoras no regex evitam que "Rotas" combine com "Otimização de Rotas".

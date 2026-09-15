@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { axe } from './axeHelper';
 import { renderWithProviders } from './renderWithProviders';
@@ -13,6 +14,9 @@ import Veiculos from '@/pages/Veiculos';
 import Entregas from '@/pages/Entregas';
 import Rotas from '@/pages/Rotas';
 import OtimizacaoRotas from '@/pages/OtimizacaoRotas';
+import Pedidos from '@/pages/Pedidos';
+import Planos from '@/pages/Planos';
+import PlanoDetalhe from '@/pages/PlanoDetalhe';
 import Relatorios from '@/pages/Relatorios';
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -104,6 +108,38 @@ describe('acessibilidade (regressão estrutural)', () => {
   test('Otimização de Rotas (estado inicial, sem pedidos gerados) não tem violações de acessibilidade', async () => {
     const { container, findByText } = renderWithProviders(<OtimizacaoRotas />);
     await findByText('Gere pedidos simulados para começar.');
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Pedidos (lista vazia) não tem violações de acessibilidade', async () => {
+    const { container, findByText } = renderWithProviders(<Pedidos />);
+    await findByText('Nenhum pedido disponível — gere alguns pra começar.');
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Planos (lista vazia) não tem violações de acessibilidade', async () => {
+    const { container, findByText } = renderWithProviders(<Planos />);
+    await findByText('Nenhum plano criado ainda. Selecione pedidos na tela de Pedidos pra criar o primeiro.');
+    await expect(axe(container)).resolves.toHaveNoViolations();
+  });
+
+  test('Detalhe do plano não tem violações de acessibilidade', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: {
+        id: 'plano1',
+        nome: 'Plano Teste',
+        status: 'ABERTO',
+        criadoEm: new Date().toISOString(),
+        pedidos: [],
+      },
+    });
+    const { container, findByText } = renderWithProviders(
+      <Routes>
+        <Route path="/planos/:id" element={<PlanoDetalhe />} />
+      </Routes>,
+      { route: '/planos/plano1' }
+    );
+    await findByText('Plano Teste');
     await expect(axe(container)).resolves.toHaveNoViolations();
   });
 
