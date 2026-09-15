@@ -13,6 +13,30 @@ vi.mock('@/lib/api', async (importOriginal) => {
 });
 const mockedApi = vi.mocked(api, true);
 
+// Leaflet nunca é montado em teste automatizado neste projeto — mock expõe
+// só os grupos recebidos, pra afirmar sobre eles sem precisar de DOM real.
+vi.mock('./PlanoMapa', () => ({
+  default: ({ grupos }: { grupos: { indice: number; pedidos: { codigo: string }[] }[] }) => (
+    <div data-testid="plano-mapa">
+      {grupos.map((grupo) => (
+        <div key={grupo.indice} data-testid={`mapa-rota-${grupo.indice}`}>
+          {grupo.pedidos.length} pedido(s)
+        </div>
+      ))}
+    </div>
+  ),
+}));
+
+function resultadoOtimizacaoFake(pedidos: { id: string }[]) {
+  return {
+    ordem: pedidos.map((p, indice) => ({ ...p, posicao: indice + 1 })),
+    distanciaOtimizadaKm: 1,
+    distanciaOriginalKm: 1,
+    economiaPercentual: 0,
+    rotaReal: null,
+  };
+}
+
 function pedido(id: string, codigo: string, rotaIndex: number | null = null) {
   return {
     id,
@@ -74,7 +98,13 @@ describe('PlanoDetalhe', () => {
     // useOtimizarPlano invalida a query e ela refaz um GET — precisa refletir
     // o plano já otimizado nessa segunda chamada, não só na resposta do POST.
     mockedApi.get.mockResolvedValueOnce({ data: planoAberto() }).mockResolvedValue({ data: planoOtimizado });
-    mockedApi.post.mockResolvedValue({ data: planoOtimizado });
+    // Dois endpoints diferentes atrás do mesmo mock de POST: o de otimizar o
+    // plano (chunking) e o de otimizar cada rota pro mapa (traçado real).
+    mockedApi.post.mockImplementation((url: string, body?: unknown) => {
+      if (url === '/planos/plano1/otimizar') return Promise.resolve({ data: planoOtimizado });
+      const { pedidos } = body as { pedidos?: { id: string }[] };
+      return Promise.resolve({ data: resultadoOtimizacaoFake(pedidos ?? []) });
+    });
     renderPlano();
     await screen.findByText('Plano Norte');
 
@@ -94,6 +124,42 @@ describe('PlanoDetalhe', () => {
     expect(within(secaoRota1).getByText('PED-001')).toBeInTheDocument();
     expect(within(secaoRota1).getByText('PED-002')).toBeInTheDocument();
     expect(within(secaoRota1).queryByText('PED-003')).not.toBeInTheDocument();
+  });
+
+  test('depois de otimizar, calcula o traçado de cada rota (uma chamada por grupo) e alimenta o mapa', async () => {
+    const user = userEvent.setup();
+    const planoOtimizado = {
+      ...planoAberto(),
+      status: 'OTIMIZADO' as const,
+      pedidos: [pedido('p1', 'PED-001', 1), pedido('p2', 'PED-002', 1), pedido('p3', 'PED-003', 2)],
+    };
+    mockedApi.get.mockResolvedValueOnce({ data: planoAberto() }).mockResolvedValue({ data: planoOtimizado });
+    mockedApi.post.mockImplementation((url: string, body?: unknown) => {
+      if (url === '/planos/plano1/otimizar') return Promise.resolve({ data: planoOtimizado });
+      const { pedidos } = body as { pedidos?: { id: string }[] };
+      return Promise.resolve({ data: resultadoOtimizacaoFake(pedidos ?? []) });
+    });
+    renderPlano();
+    await screen.findByText('Plano Norte');
+
+    await user.click(screen.getByRole('button', { name: /Otimizar Plano/ }));
+    await screen.findByText('Plano otimizado.');
+
+    await waitFor(() => expect(screen.getByTestId('mapa-rota-1')).toHaveTextContent('2 pedido(s)'));
+    expect(screen.getByTestId('mapa-rota-2')).toHaveTextContent('1 pedido(s)');
+
+    const chamadasOtimizarRota = mockedApi.post.mock.calls.filter(([url]) => url === '/otimizacao-rotas/otimizar');
+    expect(chamadasOtimizarRota).toHaveLength(2);
+    expect(chamadasOtimizarRota[0][1]).toMatchObject({ pedidos: [{ id: 'p1' }, { id: 'p2' }] });
+    expect(chamadasOtimizarRota[1][1]).toMatchObject({ pedidos: [{ id: 'p3' }] });
+  });
+
+  test('plano Aberto não mostra o mapa de rotas', async () => {
+    mockedApi.get.mockResolvedValue({ data: planoAberto() });
+    renderPlano();
+
+    await screen.findByText('Plano Norte');
+    expect(screen.queryByTestId('plano-mapa')).not.toBeInTheDocument();
   });
 
   test('renomear o plano', async () => {
