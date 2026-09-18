@@ -49,7 +49,7 @@ Projeto Railway "controlog" (ambiente "production")
 
 ## CI/CD
 
-- **CI** — a cada `push`/`pull request` para `main`, o workflow
+- **CI** — a cada `push`/`pull request` para `main` ou `develop`, o workflow
   [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) roda os testes do backend
   (Jest) e do frontend (lint + build + Vitest) no GitHub Actions.
 - **CD** — `controlog-backend` e `controlog-frontend` estão conectados ao repositório

@@ -141,7 +141,7 @@ três serviços no mesmo projeto (não usamos Vercel/Netlify/Firebase/Render, pl
 otimizadas só para frontend estático e fora de escopo para este trabalho a partir de
 2026-02). Migrations rodam automaticamente a cada deploy do backend.
 
-CI/CD: todo `push`/PR para `main` roda os testes de backend e frontend via GitHub
+CI/CD: todo `push`/PR para `main` ou `develop` roda os testes de backend e frontend via GitHub
 Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); cada serviço no
 Railway está conectado ao repositório e faz deploy automático quando sua respectiva
 pasta muda em `main`. Detalhes completos, variáveis de ambiente e passo a passo para
