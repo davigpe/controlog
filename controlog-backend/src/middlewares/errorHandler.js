@@ -40,8 +40,9 @@ export function errorHandler(err, req, res, next) {
 }
 
 export function notFoundHandler(req, res) {
-  res.status(404).json({
+  return res.status(404).json({
     error: 'NotFoundError',
     message: `Rota ${req.method} ${req.originalUrl} não existe.`,
+    path: req.originalUrl,
   });
 }

@@ -1,0 +1,12 @@
+{
+  "name": "crontrolog",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm --prefix controlog-backend run dev",
+    "dev:frontend": "npm --prefix controlog-frontend run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
