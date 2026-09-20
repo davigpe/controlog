@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "prisma migrate deploy && node src/server.js",
+    "vercel-build": "prisma migrate deploy",
     "postinstall": "prisma generate",
     "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:coverage": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage",

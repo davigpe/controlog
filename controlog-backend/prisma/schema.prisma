@@ -6,8 +6,13 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // DATABASE_URL: connection string com pooler (usada em runtime pela API).
+  // DIRECT_URL: connection string direta, sem pooler (usada só pelo Prisma
+  // CLI em `migrate deploy`/`migrate dev`) — necessário com Neon/Supabase
+  // porque migrations não funcionam bem através de um pooler transacional.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum UsuarioPerfil {

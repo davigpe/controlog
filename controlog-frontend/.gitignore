@@ -25,4 +25,4 @@ coverage
 *.sw?
 .env*
 !.env.example
-.railway
+.vercel
