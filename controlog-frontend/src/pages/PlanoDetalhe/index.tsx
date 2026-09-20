@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CheckCircle2, Pencil, Route as RouteIcon } from 'lucide-react';
+import { CheckCircle2, Pencil, RefreshCw, Route as RouteIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -176,6 +176,23 @@ export default function PlanoDetalhe() {
 
   const pedidosDoGrupoEmAprovacao = grupos?.find(([indice]) => indice === aprovando)?.[1] ?? [];
 
+  // Ação manual, separada do useEffect de cálculo automático — útil pra
+  // tentar de novo só uma rota cujo traçado real falhou (ex.: limite de
+  // requisições da ORS), sem precisar reotimizar o plano inteiro e mexer
+  // no agrupamento de rotas já aprovadas.
+  async function handleReotimizarRota(indice: number, pedidos: PedidoDoPlano[]) {
+    setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'calculando' }));
+    try {
+      const resultado = await otimizarRotaMutation.mutateAsync({ origem: DEPOSITO, pedidos });
+      setResultadosPorGrupo((atual) => ({ ...atual, [indice]: resultado }));
+      setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'calculada' }));
+      toast.success(`Traçado da Rota ${indice} recalculado.`);
+    } catch (error) {
+      setStatusPorGrupo((atual) => ({ ...atual, [indice]: 'erro' }));
+      toast.error(getErrorMessage(error, 'Não foi possível recalcular esta rota.'));
+    }
+  }
+
   if (isLoading) {
     return <div className="p-6 text-sm text-muted-foreground">Carregando plano...</div>;
   }
@@ -261,7 +278,20 @@ export default function PlanoDetalhe() {
                   <span className="text-xs text-muted-foreground">
                     {veiculoDoGrupo(indice - 1)} · {pedidosDoGrupo.length} pedido(s)
                   </span>
-                  <div className="ml-auto">
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      title={`Reotimizar traçado da Rota ${indice}`}
+                      aria-label={`Reotimizar Rota ${indice}`}
+                      disabled={statusPorGrupo[indice] === 'calculando'}
+                      onClick={() => handleReotimizarRota(indice, pedidosDoGrupo)}
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 ${statusPorGrupo[indice] === 'calculando' ? 'animate-spin' : ''}`}
+                      />
+                    </Button>
                     {codigoAprovado ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                         <CheckCircle2 className="w-3.5 h-3.5" />

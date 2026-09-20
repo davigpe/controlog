@@ -74,7 +74,7 @@ de uma mesma rede por causa de uma única tentativa.
 
 - **Backend:** 151 testes em 19 suítes — **94,6% statements**, **92,1% funções**, **77,4% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 161 testes em 28 suítes — **81,1% statements**, **74,8% funções**, **78,6% branches**.
+- **Frontend:** 162 testes em 28 suítes — **81,1% statements**, **74,9% funções**, **78,7% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
@@ -190,6 +190,7 @@ práticas de segurança/escalabilidade:
 | Plano detalhe | Otimizar divide os pedidos em grupos por `rotaIndex`, cada um com nome/cor/veículo derivados da posição do grupo; renomear o plano | `src/pages/PlanoDetalhe/index.test.tsx` |
 | Plano detalhe | Grupo com `pedido.rota` preenchido mostra o badge "Aprovada — RT-XXX" em vez do botão; clicar em "Aprovar Rota" abre o modal com o grupo certo (seleção de motorista/veículo verificada manualmente, mesma lacuna já documentada para `RotaModal`) | `src/pages/PlanoDetalhe/index.test.tsx`, `src/test/a11y.test.tsx` |
 | Plano detalhe | Depois de otimizar, calcula o traçado de cada rota com uma chamada sequencial por grupo (`/otimizacao-rotas/otimizar`) e alimenta o mapa (mockado); plano Aberto não mostra mapa | `src/pages/PlanoDetalhe/index.test.tsx` |
+| Plano detalhe | Botão "Reotimizar" recalcula o traçado de uma única rota (nova chamada só com os pedidos daquele grupo), sem mexer nas outras | `src/pages/PlanoDetalhe/index.test.tsx` |
 
 ## 6. Roteiro de teste exploratório de front-end (executado)
 

@@ -199,6 +199,33 @@ describe('PlanoDetalhe', () => {
     expect(screen.getByText('2 pedido(s) vão virar uma rota real, com uma entrega vinculada pra cada um.')).toBeInTheDocument();
   });
 
+  test('botão de reotimizar recalcula o traçado de uma única rota', async () => {
+    const user = userEvent.setup();
+    const planoOtimizado = {
+      ...planoAberto(),
+      status: 'OTIMIZADO' as const,
+      pedidos: [pedido('p1', 'PED-001', 1), pedido('p2', 'PED-002', 1), pedido('p3', 'PED-003', 2)],
+    };
+    mockedApi.get.mockResolvedValue({ data: planoOtimizado });
+    mockedApi.post.mockImplementation((_url: string, body?: unknown) => {
+      const { pedidos } = body as { pedidos?: { id: string }[] };
+      return Promise.resolve({ data: resultadoOtimizacaoFake(pedidos ?? []) });
+    });
+    renderPlano();
+    await screen.findByText('Rota 1');
+
+    // Cálculo automático inicial: uma chamada por grupo (2 grupos).
+    await waitFor(() => expect(mockedApi.post).toHaveBeenCalledTimes(2));
+
+    await user.click(screen.getByRole('button', { name: 'Reotimizar Rota 1' }));
+
+    await waitFor(() => expect(mockedApi.post).toHaveBeenCalledTimes(3));
+    const [url, body] = mockedApi.post.mock.calls[2];
+    expect(url).toBe('/otimizacao-rotas/otimizar');
+    expect((body as { pedidos: { id: string }[] }).pedidos.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(await screen.findByText('Traçado da Rota 1 recalculado.')).toBeInTheDocument();
+  });
+
   test('plano Aberto não mostra o mapa de rotas', async () => {
     mockedApi.get.mockResolvedValue({ data: planoAberto() });
     renderPlano();
