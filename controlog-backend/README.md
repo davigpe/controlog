@@ -2,7 +2,7 @@
 
 Backend do Controlog, seguindo a arquitetura descrita no RFC (Node.js + Express + PostgreSQL, autenticação JWT).
 
-Em produção: https://controlog-backend-production.up.railway.app (hospedado no Railway — ver [`../docs/DEPLOY.md`](../docs/DEPLOY.md)).
+Em produção: https://controlog-backend.vercel.app _(atualizar após o primeiro deploy)_ (hospedado na Vercel como Serverless Function — ver [`../docs/DEPLOY.md`](../docs/DEPLOY.md)).
 
 ## Stack
 

@@ -4,7 +4,7 @@ Sistema de gestão logística para pequenas e médias empresas de transporte, co
 
 Este é o repositório do projeto de portfólio desenvolvido para a disciplina de Engenharia de Software (Católica SC). A especificação completa — contexto, personas, requisitos funcionais/não funcionais, regras de negócio e arquitetura — está no RFC do projeto.
 
-**🌐 Em produção:** [controlog-frontend-production.up.railway.app](https://controlog-frontend-production.up.railway.app) — login de teste `gestor@controlog.com` / `controlog123`.
+**🌐 Em produção:** [controlog-frontend.vercel.app](https://controlog-frontend.vercel.app) _(atualizar após o primeiro deploy)_ — login de teste `gestor@controlog.com` / `controlog123`.
 
 ---
 
@@ -136,14 +136,19 @@ escopo em [`docs/AUDITORIA_ACESSIBILIDADE.md`](docs/AUDITORIA_ACESSIBILIDADE.md)
 
 ## 🚀 Deploy
 
-O projeto está publicado no **Railway** — frontend, backend e PostgreSQL rodando como
-três serviços no mesmo projeto (não usamos Vercel/Netlify/Firebase/Render, plataformas
-otimizadas só para frontend estático e fora de escopo para este trabalho a partir de
-2026-02). Migrations rodam automaticamente a cada deploy do backend.
+O projeto está publicado na **Vercel** — frontend e backend como dois projetos
+separados (o backend roda como Serverless Function, embrulhando o mesmo Express de
+sempre), com o banco PostgreSQL no **Neon**. Migrations rodam automaticamente a cada
+build do backend.
+
+> Nota: a partir de 2026-02 a disciplina passou a não aceitar hospedagem em
+> plataformas otimizadas só para frontend estático (Vercel/Netlify/Firebase/Render) —
+> essa restrição formalmente continua valendo; a migração para Vercel foi uma decisão
+> consciente do autor do projeto.
 
 CI/CD: todo `push`/PR para `main` roda os testes de backend e frontend via GitHub
-Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); cada serviço no
-Railway está conectado ao repositório e faz deploy automático quando sua respectiva
+Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); os dois projetos na
+Vercel estão conectados ao repositório e fazem deploy automático quando sua respectiva
 pasta muda em `main`. Detalhes completos, variáveis de ambiente e passo a passo para
 reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
@@ -155,7 +160,7 @@ O repositório segue o modelo **Git Flow**:
 
 | Branch | Propósito |
 |---|---|
-| `main` | Produção — só recebe merge de `release/*` ou `hotfix/*`. Dispara o deploy automático (Railway). |
+| `main` | Produção — só recebe merge de `release/*` ou `hotfix/*`. Dispara o deploy automático (Vercel). |
 | `develop` | Integração — base para novas features, sempre com o estado mais recente pronto para o próximo release. |
 | `feature/nome-da-feature` | Uma funcionalidade em desenvolvimento, criada a partir de `develop`, mesclada de volta nela. |
 | `release/x.y.z` | Estabilização de uma versão antes de publicar — criada a partir de `develop`, mesclada em `main` **e** `develop`. |
