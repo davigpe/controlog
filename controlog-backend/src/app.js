@@ -11,6 +11,12 @@ import { router } from './routes/index.js';
 export function createApp() {
   const app = express();
 
+  // Necessário em qualquer plataforma que rode atrás de um proxy reverso
+  // (Vercel, entre outras) — sem isso, o Express não confia no cabeçalho
+  // X-Forwarded-For, e o express-rate-limit (abaixo) não consegue
+  // identificar o IP de quem fez a requisição.
+  app.set('trust proxy', 1);
+
   app.use(helmet());
   app.use(
     cors({
