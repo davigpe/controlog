@@ -175,6 +175,12 @@ O repositório usa a extensão [git-flow (AVH Edition)](https://github.com/peter
 
 ---
 
+## 🔭 Próximos passos
+
+Funcionalidades e melhorias planejadas — veja [docs/ROADMAP.md](docs/ROADMAP.md).
+
+---
+
 ## 📄 Licença
 
 Este projeto está sob a licença MIT — veja [LICENSE](LICENSE).
