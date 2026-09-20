@@ -91,13 +91,24 @@ export function createPlanoService(prisma) {
       // compacta.
       const ordemGeografica = ordenarPorVarredura(DEPOSITO, plano.pedidos);
 
-      await prisma.$transaction(async (tx) => {
-        for (let i = 0; i < ordemGeografica.length; i++) {
-          const rotaIndex = Math.floor(i / tamanhoRota) + 1;
-          await tx.pedido.update({ where: { id: ordemGeografica[i].id }, data: { rotaIndex } });
-        }
-        await tx.plano.update({ where: { id }, data: { status: 'OTIMIZADO' } });
-      });
+      // Agrupado em updateMany por rotaIndex (1 query por rota, não 1 por
+      // pedido) — com muitos pedidos, um update individual por linha estourava
+      // o timeout padrão da transação do Prisma (5s) contra um banco remoto
+      // (Neon), por causa da latência de rede de cada round-trip.
+      await prisma.$transaction(
+        async (tx) => {
+          for (let inicio = 0; inicio < ordemGeografica.length; inicio += tamanhoRota) {
+            const grupo = ordemGeografica.slice(inicio, inicio + tamanhoRota);
+            const rotaIndex = inicio / tamanhoRota + 1;
+            await tx.pedido.updateMany({
+              where: { id: { in: grupo.map((p) => p.id) } },
+              data: { rotaIndex },
+            });
+          }
+          await tx.plano.update({ where: { id }, data: { status: 'OTIMIZADO' } });
+        },
+        { timeout: 10000 }
+      );
 
       return this.getById(id);
     },
@@ -140,61 +151,68 @@ export function createPlanoService(prisma) {
       const latDestino = pedidosDoGrupo.reduce((soma, p) => soma + p.lat, 0) / pedidosDoGrupo.length;
       const lngDestino = pedidosDoGrupo.reduce((soma, p) => soma + p.lng, 0) / pedidosDoGrupo.length;
 
-      return prisma.$transaction(async (tx) => {
-        const codigosRota = await tx.rota.findMany({
-          where: { codigo: { startsWith: 'RT-' } },
-          select: { codigo: true },
-        });
-        const codigoRota = proximoCodigoSequencial(
-          codigosRota.map((r) => r.codigo),
-          'RT-'
-        );
+      return prisma.$transaction(
+        async (tx) => {
+          const codigosRota = await tx.rota.findMany({
+            where: { codigo: { startsWith: 'RT-' } },
+            select: { codigo: true },
+          });
+          const codigoRota = proximoCodigoSequencial(
+            codigosRota.map((r) => r.codigo),
+            'RT-'
+          );
 
-        const rota = await tx.rota.create({
-          data: {
-            codigo: codigoRota,
-            origem: 'Centro de Distribuição',
-            destino: cidades.join(', '),
-            latOrigem: DEPOSITO.lat,
-            lngOrigem: DEPOSITO.lng,
-            latDestino,
-            lngDestino,
-            status: 'ATIVA',
-            dataHora,
-            motoristaId,
-            veiculoId,
-          },
-        });
-
-        await tx.pedido.updateMany({
-          where: { planoId, rotaIndex: indice },
-          data: { rotaId: rota.id },
-        });
-
-        const codigosEntrega = await tx.entrega.findMany({
-          where: { codigo: { startsWith: 'EN-' } },
-          select: { codigo: true },
-        });
-        let proximoCodigoEntrega = proximoCodigoSequencial(
-          codigosEntrega.map((e) => e.codigo),
-          'EN-'
-        );
-        for (const pedido of pedidosDoGrupo) {
-          await tx.entrega.create({
+          const rota = await tx.rota.create({
             data: {
-              codigo: proximoCodigoEntrega,
+              codigo: codigoRota,
+              origem: 'Centro de Distribuição',
+              destino: cidades.join(', '),
+              latOrigem: DEPOSITO.lat,
+              lngOrigem: DEPOSITO.lng,
+              latDestino,
+              lngDestino,
+              status: 'ATIVA',
+              dataHora,
+              motoristaId,
+              veiculoId,
+            },
+          });
+
+          await tx.pedido.updateMany({
+            where: { planoId, rotaIndex: indice },
+            data: { rotaId: rota.id },
+          });
+
+          // Códigos calculados em memória (sem consultar o banco a cada
+          // iteração) e gravados num createMany só — mesmo motivo do
+          // otimizar(): 1 query em vez de 1 por pedido evita estourar o
+          // timeout da transação contra um banco remoto.
+          const codigosEntrega = await tx.entrega.findMany({
+            where: { codigo: { startsWith: 'EN-' } },
+            select: { codigo: true },
+          });
+          let proximoCodigoEntrega = proximoCodigoSequencial(
+            codigosEntrega.map((e) => e.codigo),
+            'EN-'
+          );
+          const entregasData = pedidosDoGrupo.map((pedido) => {
+            const codigo = proximoCodigoEntrega;
+            proximoCodigoEntrega = proximoCodigoSequencial([proximoCodigoEntrega], 'EN-');
+            return {
+              codigo,
               destino: `${pedido.endereco}, ${pedido.cidade}`,
               status: 'PENDENTE',
               dataPrevista: dataHora,
               rotaId: rota.id,
               motoristaId,
-            },
+            };
           });
-          proximoCodigoEntrega = proximoCodigoSequencial([proximoCodigoEntrega], 'EN-');
-        }
+          await tx.entrega.createMany({ data: entregasData });
 
-        return rota;
-      });
+          return rota;
+        },
+        { timeout: 10000 }
+      );
     },
 
     async remove(id) {

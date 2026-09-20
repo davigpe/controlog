@@ -7,7 +7,7 @@ function buildPrismaMock() {
     plano: { create: jest.fn(), update: jest.fn(), findUnique: jest.fn() },
     pedido: { updateMany: jest.fn(), update: jest.fn() },
     rota: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
-    entrega: { findMany: jest.fn().mockResolvedValue([]), create: jest.fn() },
+    entrega: { findMany: jest.fn().mockResolvedValue([]), createMany: jest.fn() },
   };
 
   return {
@@ -97,13 +97,12 @@ describe('plano.service — otimizar', () => {
     await service.otimizar('plano1', { tamanhoRota: 2 });
 
     // Ordem angular esperada a partir do depósito: sul, leste, nordeste, norte, oeste.
-    const chamadas = prisma._tx.pedido.update.mock.calls.map(([args]) => args);
+    // Agrupado por rotaIndex num updateMany só por grupo (não 1 update por pedido).
+    const chamadas = prisma._tx.pedido.updateMany.mock.calls.map(([args]) => args);
     expect(chamadas).toEqual([
-      { where: { id: 'p3' }, data: { rotaIndex: 1 } },
-      { where: { id: 'p4' }, data: { rotaIndex: 1 } },
-      { where: { id: 'p5' }, data: { rotaIndex: 2 } },
-      { where: { id: 'p1' }, data: { rotaIndex: 2 } },
-      { where: { id: 'p2' }, data: { rotaIndex: 3 } },
+      { where: { id: { in: ['p3', 'p4'] } }, data: { rotaIndex: 1 } },
+      { where: { id: { in: ['p5', 'p1'] } }, data: { rotaIndex: 2 } },
+      { where: { id: { in: ['p2'] } }, data: { rotaIndex: 3 } },
     ]);
     expect(prisma._tx.plano.update).toHaveBeenCalledWith({
       where: { id: 'plano1' },
@@ -176,26 +175,27 @@ describe('plano.service — aprovarRota', () => {
       where: { planoId: 'plano1', rotaIndex: 1 },
       data: { rotaId: 'rota1' },
     });
-    expect(prisma._tx.entrega.create).toHaveBeenCalledTimes(2);
-    expect(prisma._tx.entrega.create).toHaveBeenNthCalledWith(1, {
-      data: {
-        codigo: 'EN-001',
-        destino: 'Rua A, 1, Centro',
-        status: 'PENDENTE',
-        dataPrevista: payload.dataHora,
-        rotaId: 'rota1',
-        motoristaId: 'm1',
-      },
-    });
-    expect(prisma._tx.entrega.create).toHaveBeenNthCalledWith(2, {
-      data: {
-        codigo: 'EN-002',
-        destino: 'Rua B, 2, Bucarein',
-        status: 'PENDENTE',
-        dataPrevista: payload.dataHora,
-        rotaId: 'rota1',
-        motoristaId: 'm1',
-      },
+    // createMany só (não 1 create por pedido) — códigos calculados em memória.
+    expect(prisma._tx.entrega.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma._tx.entrega.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          codigo: 'EN-001',
+          destino: 'Rua A, 1, Centro',
+          status: 'PENDENTE',
+          dataPrevista: payload.dataHora,
+          rotaId: 'rota1',
+          motoristaId: 'm1',
+        },
+        {
+          codigo: 'EN-002',
+          destino: 'Rua B, 2, Bucarein',
+          status: 'PENDENTE',
+          dataPrevista: payload.dataHora,
+          rotaId: 'rota1',
+          motoristaId: 'm1',
+        },
+      ],
     });
   });
 
