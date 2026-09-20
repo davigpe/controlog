@@ -2,7 +2,7 @@
 
 SPA do Controlog, consumindo a API REST em `controlog-backend`.
 
-Em produção: https://controlog-frontend-production.up.railway.app (hospedado no Railway — ver [`../docs/DEPLOY.md`](../docs/DEPLOY.md)).
+Em produção: https://controlog-frontend.vercel.app _(atualizar após o primeiro deploy)_ (hospedado na Vercel — ver [`../docs/DEPLOY.md`](../docs/DEPLOY.md)).
 
 ## Stack
 
