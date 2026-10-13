@@ -67,7 +67,7 @@ O projeto tem duas partes que rodam separadamente: a API (`controlog-backend`) e
 
 ### Pré-requisitos
 
-* Node.js 20+
+* Node.js 22.12+ (exigência do frontend, definida em `engines`; o backend roda em 20+)
 * Docker Desktop (para o PostgreSQL local)
 
 ### 1. Banco de dados

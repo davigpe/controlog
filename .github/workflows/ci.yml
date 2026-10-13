@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# Cancela a execução anterior da mesma branch/PR quando chega um push novo
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     name: Backend — testes
