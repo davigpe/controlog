@@ -110,6 +110,49 @@ describe('plano.service — otimizar', () => {
     });
   });
 
+  test('reotimizar não mexe nos pedidos de rotas já aprovadas e pula o índice delas', async () => {
+    const prisma = buildPrismaMock();
+    const pedidos = [
+      ...pedidosEmCruz(),
+      // Rota 1 já aprovada (virou RT-001): esses pedidos não podem ser redistribuídos.
+      { id: 'a1', lat: DEPOSITO.lat - 0.03, lng: DEPOSITO.lng, rotaIndex: 1, rotaId: 'rota1' },
+      { id: 'a2', lat: DEPOSITO.lat - 0.03, lng: DEPOSITO.lng + 0.01, rotaIndex: 1, rotaId: 'rota1' },
+    ];
+    prisma.plano.findUnique
+      .mockResolvedValueOnce({ id: 'plano1', pedidos })
+      .mockResolvedValueOnce({ id: 'plano1', pedidos });
+
+    const service = createPlanoService(prisma);
+    await service.otimizar('plano1', { tamanhoRota: 2 });
+
+    const chamadas = prisma._tx.pedido.updateMany.mock.calls.map(([args]) => args);
+    const idsAtualizados = chamadas.flatMap((c) => c.where.id.in);
+    expect(idsAtualizados).not.toContain('a1');
+    expect(idsAtualizados).not.toContain('a2');
+    expect(chamadas).toEqual([
+      { where: { id: { in: ['p3', 'p4'] } }, data: { rotaIndex: 2 } },
+      { where: { id: { in: ['p5', 'p1'] } }, data: { rotaIndex: 3 } },
+      { where: { id: { in: ['p2'] } }, data: { rotaIndex: 4 } },
+    ]);
+  });
+
+  test('rejeita reotimizar quando todas as rotas do plano já foram aprovadas', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({
+      id: 'plano1',
+      pedidos: [
+        { id: 'a1', lat: DEPOSITO.lat, lng: DEPOSITO.lng + 0.01, rotaIndex: 1, rotaId: 'rota1' },
+      ],
+    });
+
+    const service = createPlanoService(prisma);
+
+    await expect(service.otimizar('plano1', { tamanhoRota: 3 })).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   test('rejeita otimizar um plano sem nenhum pedido', async () => {
     const prisma = buildPrismaMock();
     prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', pedidos: [] });
