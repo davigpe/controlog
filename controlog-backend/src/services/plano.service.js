@@ -85,11 +85,23 @@ export function createPlanoService(prisma) {
         throw new ValidationError('Este plano não tem nenhum pedido pra otimizar.');
       }
 
+      // Pedidos de rotas já aprovadas (rotaId preenchido) ficam de fora: eles
+      // já viraram uma Rota real com Entregas, então mexer no rotaIndex deles
+      // desmontaria o grupo aprovado e misturaria pedidos aprovados com
+      // pendentes no mesmo grupo (que aí nunca mais poderia ser aprovado).
+      const pendentes = plano.pedidos.filter((p) => p.rotaId == null);
+      if (pendentes.length === 0) {
+        throw new ValidationError('Todas as rotas deste plano já foram aprovadas.');
+      }
+      const indicesAprovados = new Set(
+        plano.pedidos.filter((p) => p.rotaId != null).map((p) => p.rotaIndex),
+      );
+
       // Varredura geográfica antes de cortar em fatias de tamanhoRota — sem
       // isso, o corte seguiria a ordem de criação dos pedidos e cada rota
       // acabaria espalhada pela cidade inteira em vez de cobrir uma região
       // compacta.
-      const ordemGeografica = ordenarPorVarredura(DEPOSITO, plano.pedidos);
+      const ordemGeografica = ordenarPorVarredura(DEPOSITO, pendentes);
 
       // Agrupado em updateMany por rotaIndex (1 query por rota, não 1 por
       // pedido) — com muitos pedidos, um update individual por linha estourava
@@ -97,9 +109,13 @@ export function createPlanoService(prisma) {
       // (Neon), por causa da latência de rede de cada round-trip.
       await prisma.$transaction(
         async (tx) => {
+          // Os novos grupos pulam os índices já ocupados por rotas aprovadas.
+          let rotaIndex = 0;
           for (let inicio = 0; inicio < ordemGeografica.length; inicio += tamanhoRota) {
             const grupo = ordemGeografica.slice(inicio, inicio + tamanhoRota);
-            const rotaIndex = inicio / tamanhoRota + 1;
+            do {
+              rotaIndex++;
+            } while (indicesAprovados.has(rotaIndex));
             await tx.pedido.updateMany({
               where: { id: { in: grupo.map((p) => p.id) } },
               data: { rotaIndex },
