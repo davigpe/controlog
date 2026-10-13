@@ -11,6 +11,10 @@ import { router } from './routes/index.js';
 export function createApp() {
   const app = express();
 
+  // Atrás do proxy do Railway, sem isso o req.ip é sempre o IP do proxy e o rate
+  // limit passa a contar todos os usuários como um só.
+  app.set('trust proxy', env.trustProxy);
+
   app.use(helmet());
   app.use(
     cors({

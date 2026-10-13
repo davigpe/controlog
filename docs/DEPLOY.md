@@ -70,6 +70,7 @@ Projeto Railway "controlog" (ambiente "production")
 | `JWT_SECRET` / `JWT_REFRESH_SECRET` | gerados com `crypto.randomBytes(48)`, únicos de produção (não são os mesmos do `.env.example`) |
 | `JWT_EXPIRES_IN` / `JWT_REFRESH_EXPIRES_IN` | `1h` / `7d` |
 | `CORS_ORIGIN` | `https://controlog-frontend-production.up.railway.app` |
+| `TRUST_PROXY` | não precisa definir: em `NODE_ENV=production` o padrão é `1` (o proxy do Railway). Sem isso o rate limit enxergaria o IP do proxy e contaria todos os usuários como um só |
 
 **`controlog-frontend`**
 
