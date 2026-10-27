@@ -85,11 +85,28 @@ export function createPlanoService(prisma) {
         throw new ValidationError('Este plano não tem nenhum pedido pra otimizar.');
       }
 
+      // Pedido de grupo já aprovado (rotaId preenchido) fica de fora: ele virou
+      // Rota real com Entregas, e reagrupá-lo aqui quebraria a mesma invariante
+      // que moverPedidos protege logo abaixo — o plano e a operação passariam a
+      // contar coisas diferentes, e um grupo misturando aprovado com pendente
+      // nunca mais poderia ser aprovado.
+      const aprovado = (pedido) => Boolean(pedido.rotaId);
+      const pendentes = plano.pedidos.filter((pedido) => !aprovado(pedido));
+      if (pendentes.length === 0) {
+        throw new ValidationError('Todas as rotas deste plano já foram aprovadas.');
+      }
+
+      // Os índices dos grupos aprovados seguem ocupados — reotimizar não pode
+      // reatribuir esses números a grupos novos.
+      const indicesAprovados = new Set(
+        plano.pedidos.filter(aprovado).map((pedido) => pedido.rotaIndex)
+      );
+
       // Varredura geográfica antes de cortar em fatias de tamanhoRota — sem
       // isso, o corte seguiria a ordem de criação dos pedidos e cada rota
       // acabaria espalhada pela cidade inteira em vez de cobrir uma região
       // compacta.
-      const ordemGeografica = ordenarPorVarredura(DEPOSITO, plano.pedidos);
+      const ordemGeografica = ordenarPorVarredura(DEPOSITO, pendentes);
 
       // Agrupado em updateMany por rotaIndex (1 query por rota, não 1 por
       // pedido) — com muitos pedidos, um update individual por linha estourava
@@ -97,9 +114,13 @@ export function createPlanoService(prisma) {
       // (Neon), por causa da latência de rede de cada round-trip.
       await prisma.$transaction(
         async (tx) => {
+          let rotaIndex = 0;
           for (let inicio = 0; inicio < ordemGeografica.length; inicio += tamanhoRota) {
             const grupo = ordemGeografica.slice(inicio, inicio + tamanhoRota);
-            const rotaIndex = inicio / tamanhoRota + 1;
+            // Pula os números já ocupados por grupos aprovados.
+            do {
+              rotaIndex += 1;
+            } while (indicesAprovados.has(rotaIndex));
             await tx.pedido.updateMany({
               where: { id: { in: grupo.map((p) => p.id) } },
               data: { rotaIndex },
