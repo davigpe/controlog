@@ -106,11 +106,18 @@ operacional pelo campo `motoristas.usuario_id`. Quem entra com esse perfil só a
 (gestor/operador recebem `403` em `/api/minhas-rotas`). O recorte está em
 `src/routes/index.js`, via `requireRole`.
 
-A única escrita permitida ao motorista é concluir uma entrega dele
-(`PATCH /api/minhas-rotas/entregas/:id/concluir`, que grava `status: ENTREGUE` e
-`dataEfetiva`). A posse da entrega é conferida no service, não só pelo perfil da rota
-HTTP — o id vem da requisição, então sem essa checagem um motorista concluiria a
-entrega de outro só trocando o id.
+O motorista pode fazer duas escritas, ambas sobre entregas dele:
+`PATCH /api/minhas-rotas/entregas/:id/concluir` grava `status: ENTREGUE` e
+`dataEfetiva`; `PATCH /api/minhas-rotas/entregas/:id/insucesso` grava
+`status: NAO_ENTREGUE` com `motivoInsucesso`, `observacao` e a `dataEfetiva` da
+tentativa. `NAO_ENTREGUE` é diferente de `CANCELADA` — cancelada é o pedido que
+nunca saiu; não entregue é a tentativa feita e frustrada, que o gestor depois
+reatribui, reagenda ou cancela. Uma entrega `NAO_ENTREGUE` ainda aceita
+conclusão, porque o motorista pode voltar ao endereço no mesmo dia.
+
+A posse da entrega é conferida no service nas duas rotas, não só pelo perfil da
+rota HTTP — o id vem da requisição, então sem essa checagem um motorista mexeria
+na entrega de outro só trocando o id.
 
 Ao reatribuir uma rota a outro motorista (`PUT /api/rotas/:id` com um `motoristaId`
 diferente), as entregas da rota são movidas junto, na mesma transação:

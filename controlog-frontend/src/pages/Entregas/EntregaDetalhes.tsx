@@ -11,6 +11,7 @@ const statusStyle: Record<string, string> = {
   ENTREGUE: 'bg-green-100 text-green-700',
   EM_TRANSITO: 'bg-yellow-100 text-yellow-700',
   PENDENTE: 'bg-red-100 text-red-700',
+  NAO_ENTREGUE: 'bg-amber-100 text-amber-800',
   CANCELADA: 'bg-gray-100 text-gray-700',
 }
 
@@ -18,6 +19,7 @@ const statusLabel: Record<string, string> = {
   ENTREGUE: 'Entregue',
   EM_TRANSITO: 'Em Trânsito',
   PENDENTE: 'Pendente',
+  NAO_ENTREGUE: 'Não entregue',
   CANCELADA: 'Cancelada',
 }
 

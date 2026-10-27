@@ -1,5 +1,12 @@
 export type StatusRota = 'ATIVA' | 'CONCLUIDA' | 'CANCELADA'
-export type StatusEntrega = 'PENDENTE' | 'EM_TRANSITO' | 'ENTREGUE' | 'CANCELADA'
+export type StatusEntrega = 'PENDENTE' | 'EM_TRANSITO' | 'ENTREGUE' | 'NAO_ENTREGUE' | 'CANCELADA'
+
+export type MotivoInsucesso =
+  | 'CLIENTE_AUSENTE'
+  | 'ENDERECO_NAO_ENCONTRADO'
+  | 'RECUSADA_PELO_CLIENTE'
+  | 'AVARIA'
+  | 'OUTRO'
 
 export interface EntregaDaRota {
   id: string
@@ -8,6 +15,8 @@ export interface EntregaDaRota {
   status: StatusEntrega
   dataPrevista: string
   dataEfetiva: string | null
+  motivoInsucesso: MotivoInsucesso | null
+  observacao: string | null
 }
 
 export interface MinhaRota {

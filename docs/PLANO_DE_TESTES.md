@@ -59,7 +59,7 @@ cadastro do motorista.
 
 | Grupo de rotas | Perfis permitidos |
 |---|---|
-| `/api/minhas-rotas` (listagem e `PATCH .../entregas/:id/concluir`) | `MOTORISTA` |
+| `/api/minhas-rotas` (listagem, `PATCH .../entregas/:id/concluir` e `.../insucesso`) | `MOTORISTA` |
 | `/api/motoristas`, `/veiculos`, `/rotas`, `/entregas`, `/dashboard`, `/relatorios`, `/otimizacao-rotas`, `/pedidos`, `/planos` | `GESTOR`, `OPERADOR` |
 | `POST /api/motoristas/:id/acesso` | `GESTOR` |
 
@@ -190,6 +190,11 @@ práticas de segurança/escalabilidade:
 | Conclusão de entrega | `PATCH /api/minhas-rotas/entregas/:id/concluir` | Marca a entrega como `ENTREGUE` e grava `dataEfetiva`; funciona a partir de `PENDENTE` ou `EM_TRANSITO` | `tests/minhasRotas.service.test.js` |
 | Conclusão de entrega | Motorista tenta concluir entrega de outro motorista | `403 Forbidden` — a posse é checada no service, não só pelo perfil da rota HTTP (o id vem da requisição) | `tests/minhasRotas.service.test.js` |
 | Conclusão de entrega | Concluir entrega já `ENTREGUE` / já `CANCELADA` | `409 Conflict` / `422 Unprocessable Entity` | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | `PATCH /api/minhas-rotas/entregas/:id/insucesso` | Marca `NAO_ENTREGUE` com `motivoInsucesso`, `observacao` e `dataEfetiva` da tentativa | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Motorista registra insucesso em entrega de outro | `403 Forbidden` — mesma checagem de posse da conclusão | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Insucesso em entrega já `ENTREGUE` / já `NAO_ENTREGUE` | `409 Conflict` nos dois casos | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Motivo `OUTRO` sem observação | `422 Unprocessable Entity` — "outro" sem descrição não informa quem vai tratar a entrega | `src/validators/minhasRotas.validators.js` |
+| Segunda tentativa | Concluir uma entrega que está `NAO_ENTREGUE` | Permitido: o motorista pode voltar ao endereço e entregar | `tests/minhasRotas.service.test.js` |
 | Atribuição de rota | `PUT /api/rotas/:id` trocando `motoristaId` | As entregas da rota são movidas para o novo motorista na mesma transação — sem isso o motorista antigo continuaria vendo as entregas como dele | `tests/rota.service.test.js` |
 | Atribuição de rota | `PUT /api/rotas/:id` sem trocar o motorista | Nenhuma entrega é tocada | `tests/rota.service.test.js` |
 | Atribuição de rota | `GET /api/rotas` | Cada rota traz `totalEntregas` e `entregasPendentes` (`PENDENTE` + `EM_TRANSITO`), usados na tela de atribuição | `tests/rota.service.test.js` |
@@ -225,6 +230,7 @@ práticas de segurança/escalabilidade:
 | Perfis | Sidebar mostra só "Minhas Rotas" para o motorista e esconde esse link dos perfis de gestão | `src/components/layout/Sidebar.test.tsx` |
 | Visão do motorista | Lista as rotas atribuídas com veículo e entregas, conta rotas/entregas/pendentes no resumo, filtra por status reconsultando a API, e trata lista vazia e erro de carregamento | `src/pages/MinhasRotas/index.test.tsx` |
 | Conclusão de entrega | Botão "Concluir" chama a API e mostra o toast; entrega já concluída não oferece o botão; erro da API aparece com a mensagem do backend | `src/pages/MinhasRotas/index.test.tsx` |
+| Registro de insucesso | O modal envia motivo e observação; `OUTRO` mantém "Registrar insucesso" desabilitado até a observação ser preenchida; entrega concluída não oferece o botão; entrega `NAO_ENTREGUE` mostra motivo e observação e ainda permite concluir | `src/pages/MinhasRotas/index.test.tsx` |
 | Atribuição de rotas | Lista as rotas aprovadas com responsável e contagem de entregas, abre filtrando por `ATIVA`, troca de filtro reconsulta a API, e estado vazio explica que rotas vêm da aprovação de um plano | `src/pages/Atribuicoes/index.test.tsx` |
 | Atribuição de rotas | Trocar o motorista no modal envia o novo `motoristaId` via `PUT /rotas/:id`; "Salvar" fica desabilitado enquanto nada muda; o modal avisa quantas entregas pendentes vão junto; erro da API aparece com a mensagem do backend | `src/pages/Atribuicoes/index.test.tsx` |
 | Acesso do motorista | Gestor cria o acesso pelo modal (`POST /motoristas/:id/acesso`) e vê o toast de sucesso; operador não vê a ação; motorista que já tem login também não | `src/pages/Motoristas/index.test.tsx` |

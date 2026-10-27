@@ -205,3 +205,103 @@ describe('minhasRotas.service — concluirEntrega', () => {
     expect(prisma.entrega.findUnique).not.toHaveBeenCalled();
   });
 });
+
+describe('minhasRotas.service — registrarInsucesso', () => {
+  test('grava status NAO_ENTREGUE com motivo, observação e data da tentativa', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e1', status: 'PENDENTE', motoristaId: 'm1' });
+    prisma.entrega.update.mockResolvedValue({
+      id: 'e1',
+      codigo: 'EN-001',
+      destino: 'Rua X, 10',
+      status: 'NAO_ENTREGUE',
+      dataPrevista: new Date('2026-10-27T09:00:00Z'),
+      dataEfetiva: new Date('2026-10-27T14:30:00Z'),
+      motivoInsucesso: 'CLIENTE_AUSENTE',
+      observacao: 'Ninguém atendeu, portaria fechada.',
+    });
+
+    const service = createMinhasRotasService(prisma);
+    const entrega = await service.registrarInsucesso('u1', 'e1', {
+      motivo: 'CLIENTE_AUSENTE',
+      observacao: 'Ninguém atendeu, portaria fechada.',
+    });
+
+    const [args] = prisma.entrega.update.mock.calls[0];
+    expect(args.where).toEqual({ id: 'e1' });
+    expect(args.data.status).toBe('NAO_ENTREGUE');
+    expect(args.data.motivoInsucesso).toBe('CLIENTE_AUSENTE');
+    expect(args.data.observacao).toBe('Ninguém atendeu, portaria fechada.');
+    expect(args.data.dataEfetiva).toBeInstanceOf(Date);
+    expect(entrega.status).toBe('NAO_ENTREGUE');
+    expect(entrega.motivoInsucesso).toBe('CLIENTE_AUSENTE');
+  });
+
+  test('sem observação grava null em vez de undefined', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e1', status: 'EM_TRANSITO', motoristaId: 'm1' });
+    prisma.entrega.update.mockResolvedValue({ id: 'e1', status: 'NAO_ENTREGUE' });
+
+    const service = createMinhasRotasService(prisma);
+    await service.registrarInsucesso('u1', 'e1', { motivo: 'AVARIA' });
+
+    const [args] = prisma.entrega.update.mock.calls[0];
+    expect(args.data.observacao).toBeNull();
+  });
+
+  // Mesma checagem de dono de concluirEntrega: o id vem da requisição, então
+  // sem isso um motorista registraria insucesso na entrega de outro.
+  test('rejeita registrar insucesso em entrega de outro motorista', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e9', status: 'PENDENTE', motoristaId: 'm2' });
+
+    const service = createMinhasRotasService(prisma);
+
+    await expect(
+      service.registrarInsucesso('u1', 'e9', { motivo: 'AVARIA' })
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(prisma.entrega.update).not.toHaveBeenCalled();
+  });
+
+  test('rejeita insucesso em entrega já concluída', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e1', status: 'ENTREGUE', motoristaId: 'm1' });
+
+    const service = createMinhasRotasService(prisma);
+
+    await expect(
+      service.registrarInsucesso('u1', 'e1', { motivo: 'AVARIA' })
+    ).rejects.toBeInstanceOf(ConflictError);
+    expect(prisma.entrega.update).not.toHaveBeenCalled();
+  });
+
+  test('rejeita registrar insucesso duas vezes na mesma entrega', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e1', status: 'NAO_ENTREGUE', motoristaId: 'm1' });
+
+    const service = createMinhasRotasService(prisma);
+
+    await expect(
+      service.registrarInsucesso('u1', 'e1', { motivo: 'AVARIA' })
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  // Uma entrega que falhou ainda pode ser concluída depois: o motorista volta
+  // ao endereço no mesmo dia e entrega. Só NAO_ENTREGUE -> ENTREGUE é livre.
+  test('entrega com insucesso ainda pode ser concluída numa segunda tentativa', async () => {
+    const prisma = buildPrismaMock();
+    prisma.motorista.findUnique.mockResolvedValue(motoristaFake);
+    prisma.entrega.findUnique.mockResolvedValue({ id: 'e1', status: 'NAO_ENTREGUE', motoristaId: 'm1' });
+    prisma.entrega.update.mockResolvedValue({ id: 'e1', status: 'ENTREGUE' });
+
+    const service = createMinhasRotasService(prisma);
+    const entrega = await service.concluirEntrega('u1', 'e1');
+
+    expect(entrega.status).toBe('ENTREGUE');
+  });
+});
