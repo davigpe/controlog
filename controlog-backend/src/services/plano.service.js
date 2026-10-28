@@ -200,12 +200,13 @@ export function createPlanoService(prisma) {
 
       return prisma.$transaction(
         async (tx) => {
-          const codigosRota = await tx.rota.findMany({
+          const ultimaRota = await tx.rota.findFirst({
             where: { codigo: { startsWith: 'RT-' } },
+            orderBy: { codigo: 'desc' },
             select: { codigo: true },
           });
           const codigoRota = proximoCodigoSequencial(
-            codigosRota.map((r) => r.codigo),
+            ultimaRota ? [ultimaRota.codigo] : [],
             'RT-'
           );
 
@@ -234,12 +235,14 @@ export function createPlanoService(prisma) {
           // iteração) e gravados num createMany só — mesmo motivo do
           // otimizar(): 1 query em vez de 1 por pedido evita estourar o
           // timeout da transação contra um banco remoto.
-          const codigosEntrega = await tx.entrega.findMany({
+          // Busca apenas o último registro de entrega em vez de trazer a tabela inteira para a memória.
+          const ultimaEntrega = await tx.entrega.findFirst({
             where: { codigo: { startsWith: 'EN-' } },
+            orderBy: { codigo: 'desc' },
             select: { codigo: true },
           });
           let proximoCodigoEntrega = proximoCodigoSequencial(
-            codigosEntrega.map((e) => e.codigo),
+            ultimaEntrega ? [ultimaEntrega.codigo] : [],
             'EN-'
           );
           const entregasData = pedidosDoGrupo.map((pedido) => {
