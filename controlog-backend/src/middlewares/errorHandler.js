@@ -1,10 +1,14 @@
 import { Prisma } from '@prisma/client';
 import { AppError } from '../utils/AppError.js';
 
+function sendError(res, req, status, body) {
+  return res.status(status).json({ ...body, path: req.originalUrl });
+}
+
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
+    return sendError(res, req, err.statusCode, {
       error: err.name,
       message: err.message,
       details: err.details,
@@ -13,19 +17,19 @@ export function errorHandler(err, req, res, next) {
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
-      return res.status(409).json({
+      return sendError(res, req, 409, {
         error: 'ConflictError',
         message: `Já existe um registro com o mesmo valor para: ${err.meta?.target ?? 'campo único'}`,
       });
     }
     if (err.code === 'P2003') {
-      return res.status(409).json({
+      return sendError(res, req, 409, {
         error: 'ConflictError',
         message: 'Operação bloqueada por um vínculo existente com outro registro.',
       });
     }
     if (err.code === 'P2025') {
-      return res.status(404).json({
+      return sendError(res, req, 404, {
         error: 'NotFoundError',
         message: 'Recurso não encontrado.',
       });
@@ -33,14 +37,14 @@ export function errorHandler(err, req, res, next) {
   }
 
   console.error(err);
-  return res.status(500).json({
+  return sendError(res, req, 500, {
     error: 'InternalServerError',
     message: 'Erro interno no servidor.',
   });
 }
 
 export function notFoundHandler(req, res) {
-  res.status(404).json({
+  sendError(res, req, 404, {
     error: 'NotFoundError',
     message: `Rota ${req.method} ${req.originalUrl} não existe.`,
   });

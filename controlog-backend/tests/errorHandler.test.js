@@ -23,11 +23,16 @@ describe('errorHandler', () => {
 
   test('responde com o statusCode e a mensagem de um AppError', () => {
     const res = buildRes();
-    errorHandler(new ConflictError('conflito de teste'), {}, res, jest.fn());
+    const req = { method: 'GET', originalUrl: '/rotas/123' };
+    errorHandler(new ConflictError('conflito de teste'), req, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'ConflictError', message: 'conflito de teste' })
+      expect.objectContaining({
+        error: 'ConflictError',
+        message: 'conflito de teste',
+        path: '/rotas/123',
+      })
     );
   });
 
@@ -84,7 +89,10 @@ describe('errorHandler', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('/inexistente') })
+      expect.objectContaining({
+        message: expect.stringContaining('/inexistente'),
+        path: '/inexistente',
+      })
     );
   });
 });
