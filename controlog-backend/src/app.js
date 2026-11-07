@@ -24,7 +24,11 @@ export function createApp() {
       credentials: true,
     })
   );
-  app.use(express.json());
+  // 1 MB em vez dos 100 KB padrão: a importação de motoristas por planilha
+  // manda até 500 linhas num POST só (POST /api/motoristas/importar), o que
+  // passa dos 100 KB quando os nomes são longos. O teto de linhas no
+  // validador é que limita o lote de fato; aqui é só folga para ele caber.
+  app.use(express.json({ limit: '1mb' }));
 
   if (env.nodeEnv !== 'test') {
     app.use(morgan('dev'));

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { ConflictError, NotFoundError } from '../utils/AppError.js';
+import { ConflictError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { validarLinhaMotorista } from '../validators/motorista.validators.js';
 import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 
 // Mesmo fator de custo usado no cadastro de qualquer outro usuário
@@ -113,6 +114,73 @@ export function createMotoristaService(prisma) {
       });
 
       return this.getById(id);
+    },
+
+    // Importação em lote a partir de uma planilha. A conversão do arquivo em
+    // linhas acontece no navegador (ver Motoristas/planilha.ts) — aqui chega
+    // JSON, e a API continua sem precisar de upload multipart.
+    //
+    // É tudo ou nada: se uma linha falha, nada é gravado e a resposta devolve
+    // a lista completa de problemas, cada um com o índice da linha. O usuário
+    // corrige a planilha inteira de uma vez e reenvia; uma importação parcial
+    // o deixaria sem saber o que entrou e o que não entrou.
+    async importar(linhas) {
+      const erros = [];
+      const validos = [];
+      // CNH -> índice onde ela apareceu primeiro, para apontar o par duplicado.
+      const vistas = new Map();
+
+      linhas.forEach((linha, indice) => {
+        const resultado = validarLinhaMotorista(linha);
+        if (!resultado.ok) {
+          erros.push({ indice, mensagem: resultado.mensagem });
+          return;
+        }
+
+        const { motorista } = resultado;
+        const anterior = vistas.get(motorista.cnh);
+        if (anterior !== undefined) {
+          erros.push({
+            indice,
+            cnh: motorista.cnh,
+            mensagem: `CNH repetida na própria planilha (já aparece na linha ${anterior + 1}).`,
+          });
+          return;
+        }
+
+        vistas.set(motorista.cnh, indice);
+        validos.push({ motorista, indice });
+      });
+
+      // Uma consulta só para todas as CNHs da planilha — uma por linha
+      // custaria 500 idas ao banco num lote cheio.
+      if (vistas.size > 0) {
+        const jaCadastradas = await prisma.motorista.findMany({
+          where: { cnh: { in: [...vistas.keys()] } },
+          select: { cnh: true, nome: true },
+        });
+        for (const existente of jaCadastradas) {
+          erros.push({
+            indice: vistas.get(existente.cnh),
+            cnh: existente.cnh,
+            mensagem: `CNH já cadastrada no sistema (${existente.nome}).`,
+          });
+        }
+      }
+
+      if (erros.length > 0) {
+        erros.sort((a, b) => a.indice - b.indice);
+        throw new ValidationError(
+          `A planilha tem ${erros.length} ${erros.length === 1 ? 'linha com problema' : 'linhas com problema'}. Nada foi importado.`,
+          { erros }
+        );
+      }
+
+      const criados = await prisma.motorista.createMany({
+        data: validos.map(({ motorista }) => motorista),
+      });
+
+      return { importados: criados.count };
     },
 
     // RN03 — Não é possível excluir um motorista que possui rotas ativas vinculadas

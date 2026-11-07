@@ -27,6 +27,11 @@ export function createMotoristaController(motoristaService) {
       res.status(204).send();
     }),
 
+    importar: asyncHandler(async (req, res) => {
+      const resultado = await motoristaService.importar(req.body.motoristas);
+      res.status(201).json(resultado);
+    }),
+
     criarAcesso: asyncHandler(async (req, res) => {
       const motorista = await motoristaService.criarAcesso(req.params.id, req.body);
       res.status(201).json(motorista);
