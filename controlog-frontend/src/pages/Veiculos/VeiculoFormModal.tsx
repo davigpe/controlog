@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { StatusVeiculo, Veiculo } from './types';
+import { CATEGORIAS_VEICULO, CATEGORIA_VEICULO_AJUDA, CATEGORIA_VEICULO_LABEL } from './categoria';
+import type { CategoriaVeiculo, StatusVeiculo, Veiculo } from './types';
 
 const schema = z.object({
   placa: z.string().trim().min(6, 'Placa inválida.'),
   modelo: z.string().trim().min(2, 'Informe o modelo do veículo.'),
   capacidade: z.string().trim().min(1, 'Informe a capacidade de carga.'),
+  categoria: z.enum(CATEGORIAS_VEICULO),
   status: z.enum(['DISPONIVEL', 'MANUTENCAO', 'INATIVO']),
 });
 
@@ -34,7 +36,10 @@ export default function VeiculoFormModal({ open, veiculoEditando, onClose, onSav
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { status: 'DISPONIVEL' } });
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { categoria: 'OUTRO', status: 'DISPONIVEL' },
+  });
 
   useEffect(() => {
     if (veiculoEditando) {
@@ -42,10 +47,11 @@ export default function VeiculoFormModal({ open, veiculoEditando, onClose, onSav
         placa: veiculoEditando.placa,
         modelo: veiculoEditando.modelo,
         capacidade: veiculoEditando.capacidade,
+        categoria: veiculoEditando.categoria,
         status: veiculoEditando.status,
       });
     } else {
-      reset({ placa: '', modelo: '', capacidade: '', status: 'DISPONIVEL' });
+      reset({ placa: '', modelo: '', capacidade: '', categoria: 'OUTRO', status: 'DISPONIVEL' });
     }
   }, [veiculoEditando, open, reset]);
 
@@ -79,21 +85,49 @@ export default function VeiculoFormModal({ open, veiculoEditando, onClose, onSav
             {errors.modelo && <p className="text-xs text-red-600">{errors.modelo.message}</p>}
           </div>
 
-          <div className="space-y-1">
-            <Label htmlFor="veiculo-status">Status</Label>
-            <Select
-              value={watch('status')}
-              onValueChange={(v) => setValue('status', v as StatusVeiculo)}
-            >
-              <SelectTrigger id="veiculo-status" className="w-full">
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DISPONIVEL">Disponível</SelectItem>
-                <SelectItem value="MANUTENCAO">Manutenção</SelectItem>
-                <SelectItem value="INATIVO">Inativo</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="veiculo-categoria">Categoria</Label>
+              <Select
+                value={watch('categoria')}
+                onValueChange={(v) => setValue('categoria', v as CategoriaVeiculo)}
+              >
+                <SelectTrigger id="veiculo-categoria" className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_VEICULO.map((categoria) => (
+                    <SelectItem key={categoria} value={categoria}>
+                      <span className="flex flex-col items-start">
+                        <span>{CATEGORIA_VEICULO_LABEL[categoria]}</span>
+                        {/* Porte como apoio: "VUC" e "3/4" não são óbvios
+                            para quem não é da área. */}
+                        <span className="text-xs text-gray-500">
+                          {CATEGORIA_VEICULO_AJUDA[categoria]}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="veiculo-status">Status</Label>
+              <Select
+                value={watch('status')}
+                onValueChange={(v) => setValue('status', v as StatusVeiculo)}
+              >
+                <SelectTrigger id="veiculo-status" className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DISPONIVEL">Disponível</SelectItem>
+                  <SelectItem value="MANUTENCAO">Manutenção</SelectItem>
+                  <SelectItem value="INATIVO">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>

@@ -18,6 +18,7 @@ const sprinter: Veiculo = {
   placa: 'ABC-1234',
   modelo: 'Mercedes Sprinter',
   capacidade: '1.500 kg',
+  categoria: 'VAN',
   status: 'DISPONIVEL',
   emRota: true,
   criadoEm: new Date().toISOString(),
@@ -124,5 +125,28 @@ describe('Veiculos', () => {
       expect.objectContaining({ capacidade: '2.000 kg' })
     ));
     expect(await screen.findByText('Veículo atualizado.')).toBeInTheDocument();
+  });
+  // Categoria operacional (VUC, van, truck...) — melhoria pedida na avaliação
+  // com usuários da área de logística.
+  test('mostra a categoria do veículo no card', async () => {
+    renderWithProviders(<Veiculos />);
+
+    expect(await screen.findByText('Van')).toBeInTheDocument();
+  });
+
+  test('filtra a listagem por categoria', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Veiculos />);
+    await screen.findByText('Mercedes Sprinter');
+
+    await user.click(screen.getByRole('combobox', { name: 'Filtrar por categoria' }));
+    await user.click(await screen.findByRole('option', { name: 'VUC' }));
+
+    await waitFor(() =>
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        '/veiculos',
+        expect.objectContaining({ params: expect.objectContaining({ categoria: 'VUC' }) })
+      )
+    );
   });
 });

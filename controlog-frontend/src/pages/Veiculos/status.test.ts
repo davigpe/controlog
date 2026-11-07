@@ -8,6 +8,7 @@ function buildVeiculo(overrides: Partial<Veiculo> = {}): Veiculo {
     placa: 'ABC-1234',
     modelo: 'Mercedes Sprinter',
     capacidade: '1.500 kg',
+    categoria: 'VAN',
     status: 'DISPONIVEL',
     emRota: false,
     criadoEm: new Date().toISOString(),

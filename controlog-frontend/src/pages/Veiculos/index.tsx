@@ -8,7 +8,9 @@ import { useCreateVeiculo, useDeleteVeiculo, useUpdateVeiculo, useVeiculos } fro
 import VeiculoFormModal from './VeiculoFormModal'
 import VeiculoDetalhes from './VeiculoDetalhes'
 import { statusExibicao } from './status'
-import type { StatusVeiculo, Veiculo } from './types'
+import { CATEGORIAS_VEICULO, CATEGORIA_VEICULO_LABEL } from './categoria'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { CategoriaVeiculo, StatusVeiculo, Veiculo } from './types'
 
 const statusOptions: StatusVeiculo[] = ['DISPONIVEL', 'MANUTENCAO', 'INATIVO']
 
@@ -36,6 +38,7 @@ const statusIcon: Record<string, React.ReactNode> = {
 export default function Veiculos() {
   const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusVeiculo | 'Todos'>('Todos')
+  const [categoriaFilter, setCategoriaFilter] = useState<CategoriaVeiculo | 'Todas'>('Todas')
   const [page, setPage]                 = useState(1)
   const [selected, setSelected]         = useState<Veiculo | null>(null)
   const [editando, setEditando]         = useState<Veiculo | null>(null)
@@ -45,6 +48,7 @@ export default function Veiculos() {
   const { data, isLoading } = useVeiculos({
     busca: search || undefined,
     status: statusFilter === 'Todos' ? undefined : statusFilter,
+    categoria: categoriaFilter === 'Todas' ? undefined : categoriaFilter,
     page,
   })
   const veiculos = data?.items ?? []
@@ -76,7 +80,18 @@ export default function Veiculos() {
     setPage(1)
   }
 
-  function handleSave(data: { placa: string; modelo: string; capacidade: string; status: StatusVeiculo }) {
+  function handleCategoriaFilterChange(value: CategoriaVeiculo | 'Todas') {
+    setCategoriaFilter(value)
+    setPage(1)
+  }
+
+  function handleSave(data: {
+    placa: string
+    modelo: string
+    capacidade: string
+    categoria: CategoriaVeiculo
+    status: StatusVeiculo
+  }) {
     const mutation = editando
       ? updateMutation.mutateAsync({ id: editando.id, data })
       : createMutation.mutateAsync(data)
@@ -142,6 +157,25 @@ export default function Veiculos() {
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+        {/* Categoria em select, e não em botões como o status: são dez
+            opções, e uma fileira de dez botões não cabe no celular. */}
+        <Select
+          value={categoriaFilter}
+          onValueChange={(v) => handleCategoriaFilterChange(v as CategoriaVeiculo | 'Todas')}
+        >
+          <SelectTrigger aria-label="Filtrar por categoria" className="w-full sm:w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Todas">Todas as categorias</SelectItem>
+            {CATEGORIAS_VEICULO.map((categoria) => (
+              <SelectItem key={categoria} value={categoria}>
+                {CATEGORIA_VEICULO_LABEL[categoria]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <div className="flex gap-2 flex-wrap">
           {(['Todos', ...statusOptions] as const).map((s) => (
             <button
@@ -183,6 +217,9 @@ export default function Veiculos() {
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-800 truncate">{v.modelo}</p>
                       <p className="text-xs font-mono text-gray-600 tracking-wider">{v.placa}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {CATEGORIA_VEICULO_LABEL[v.categoria]}
+                      </p>
                     </div>
                   </div>
                 </div>
