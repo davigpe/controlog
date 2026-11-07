@@ -51,7 +51,7 @@ controlog/
 │   └── README.md            # setup detalhado do backend
 ├── controlog-frontend/    # SPA (React + TypeScript + Vite)
 │   └── src/
-│       ├── pages/           # um módulo por entidade (Rotas, Motoristas, Veículos, Entregas, Dashboard, Relatórios, Login)
+│       ├── pages/           # um módulo por tela (Rotas, Rotas do Dia, Motoristas, Veículos, Entregas, Pedidos, Planos, Dashboard, Relatórios, Login)
 │       ├── components/      # layout, UI (shadcn) e componentes compartilhados
 │       ├── stores/          # estado de autenticação (Zustand)
 │       └── lib/             # cliente HTTP (Axios) e utilitários
@@ -59,6 +59,9 @@ controlog/
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
 │   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
 │   └── DEPLOY.md                   # arquitetura de deploy, URLs e como reproduzir
+├── scripts/
+│   └── dev.mjs            # sobe banco, API e interface com um comando só
+├── package.json           # scripts da raiz (sem dependências próprias)
 └── README.md
 ```
 
@@ -66,45 +69,76 @@ controlog/
 
 ## ⚙️ Como rodar o projeto localmente
 
-O projeto tem duas partes que rodam separadamente: a API (`controlog-backend`) e a interface web (`controlog-frontend`). Ambas precisam estar de pé ao mesmo tempo.
-
 ### Pré-requisitos
 
-* Node.js 20+
+* Node.js 22.12+
 * Docker Desktop (para o PostgreSQL local)
 
-### 1. Banco de dados
+### Um comando só
+
+Na raiz do repositório:
 
 ```bash
+npm run dev
+```
+
+Isso cuida de tudo: cria os `.env` a partir dos `.env.example` se faltarem, instala as
+dependências das duas pastas na primeira vez, sobe o PostgreSQL pelo Docker Compose,
+aplica as migrations pendentes e então levanta a API e a interface juntas, com a saída
+de cada uma marcada por `[api]` e `[web]`. `Ctrl+C` derruba as duas.
+
+* API — <http://localhost:3333>
+* Interface — <http://localhost:5173>
+
+A raiz não tem dependências próprias: o script é Node puro, então não existe
+`npm install` para rodar antes.
+
+Logins criados pelo seed (senha `controlog123` nos dois):
+`gestor@controlog.com` (perfil `GESTOR`, acesso completo) e `motorista@controlog.com`
+(perfil `MOTORISTA`, só a tela "Minhas Rotas"). Na primeira execução, popule o banco com
+`npm run db:seed`.
+
+### Outros scripts da raiz
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | Banco + API + interface, tudo junto |
+| `npm run dev:sem-banco` | Idem, sem mexer no Docker nem nas migrations (para quem já tem um PostgreSQL próprio de pé) |
+| `npm run dev:api` / `npm run dev:web` | Só uma das duas pontas |
+| `npm run db:up` / `npm run db:down` | Sobe e derruba o PostgreSQL do Docker Compose |
+| `npm run db:seed` | Popula o banco com os dados de exemplo |
+| `npm run db:studio` | Abre o Prisma Studio |
+| `npm test` | Roda as suítes do backend e do frontend |
+| `npm run build` | Build de produção do frontend |
+
+### Passo a passo, se preferir controlar cada etapa
+
+<details>
+<summary>Subir banco, backend e frontend separadamente</summary>
+
+```bash
+# 1. Banco de dados
 cd controlog-backend
 cp .env.example .env
 docker compose up -d
-```
 
-### 2. Backend
-
-```bash
-cd controlog-backend
+# 2. Backend — http://localhost:3333
 npm install
 npm run prisma:generate
 npm run prisma:migrate
-npm run prisma:seed   # cria dados de exemplo e um usuário gestor de teste
-npm run dev           # http://localhost:3333
-```
+npm run prisma:seed
+npm run dev
 
-Logins de teste criados pelo seed (senha `controlog123` nos dois):
-`gestor@controlog.com` (perfil `GESTOR`, acesso completo) e `motorista@controlog.com`
-(perfil `MOTORISTA`, só a tela "Minhas Rotas").
-
-Detalhes completos (variáveis de ambiente, endpoints, regras de negócio implementadas) em [`controlog-backend/README.md`](controlog-backend/README.md).
-
-### 3. Frontend
-
-```bash
-cd controlog-frontend
+# 3. Frontend — http://localhost:5173 (em outro terminal)
+cd ../controlog-frontend
 npm install
-npm run dev            # http://localhost:5173
+npm run dev
 ```
+
+</details>
+
+Detalhes completos (variáveis de ambiente, endpoints, regras de negócio implementadas) em
+[`controlog-backend/README.md`](controlog-backend/README.md).
 
 ---
 
