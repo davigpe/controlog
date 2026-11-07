@@ -128,13 +128,13 @@ antigo continuaria vendo essas entregas como dele.
 
 | Recurso | Rotas |
 |---|---|
-| Motoristas | `GET/POST /api/motoristas`, `GET/PUT/DELETE /api/motoristas/:id`, `POST /api/motoristas/:id/acesso` (só `GESTOR`) |
+| Motoristas | `GET/POST /api/motoristas`, `GET/PUT/DELETE /api/motoristas/:id`, `POST /api/motoristas/importar` (lote por planilha), `POST /api/motoristas/:id/acesso` (só `GESTOR`) |
 | Minhas rotas (motorista) | `GET /api/minhas-rotas`, `PATCH /api/minhas-rotas/entregas/:id/concluir` (só `MOTORISTA`) |
-| Veículos | `GET/POST /api/veiculos`, `GET/PUT/DELETE /api/veiculos/:id` |
+| Veículos | `GET/POST /api/veiculos`, `GET/PUT/DELETE /api/veiculos/:id` — a listagem aceita `?categoria=VUC` (porte operacional) |
 | Rotas | `GET/POST /api/rotas`, `GET/PUT/DELETE /api/rotas/:id` |
 | Entregas | `GET/POST /api/entregas`, `GET/PUT/DELETE /api/entregas/:id` |
 | Dashboard | `GET /api/dashboard/resumo` |
-| Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...` |
+| Relatórios | `GET /api/relatorios?dataInicio=...&dataFim=...`, `GET /api/relatorios/rotas-do-dia?data=AAAA-MM-DD&base=dataHora\|criadoEm` |
 | Otimização de rotas | `POST /api/otimizacao-rotas/otimizar` |
 | Pedidos | `GET /api/pedidos?disponivel=true`, `POST /api/pedidos/gerar` |
 | Planos | `GET/POST /api/planos`, `GET/PUT/DELETE /api/planos/:id`, `POST /api/planos/:id/otimizar`, `PATCH /api/planos/:id/pedidos/rota`, `POST /api/planos/:id/rotas/:rotaIndex/aprovar` |

@@ -200,6 +200,37 @@ práticas de segurança/escalabilidade:
 | Atribuição de rota | `GET /api/rotas` | Cada rota traz `totalEntregas` e `entregasPendentes` (`PENDENTE` + `EM_TRANSITO`), usados na tela de atribuição | `tests/rota.service.test.js` |
 | Separação por perfil | Token de `MOTORISTA` em `/api/rotas`, `/motoristas`, `/planos`, `/dashboard`; token de `GESTOR` em `/api/minhas-rotas` | `403 Forbidden` nos dois sentidos — cada perfil só alcança o próprio grupo de rotas | `tests/app.test.js`, `tests/auth.middleware.test.js` |
 
+### 3.2 Melhorias vindas da avaliação com usuários da área de logística
+
+Sugestões levantadas por profissionais de logística que usaram o sistema e devolveram
+feedback. Não estavam no RFC: vieram do uso real.
+
+| ID | Caso de teste | Resultado esperado | Cobertura |
+|---|---|---|---|
+| Categoria de veículo | Cadastrar veículo informando `categoria` | Persiste e devolve a categoria (`MOTO`, `PASSEIO`, `UTILITARIO`, `VAN`, `VUC`, `TRES_QUARTOS`, `TOCO`, `TRUCK`, `CARRETA`, `OUTRO`) | `tests/veiculo.service.test.js` |
+| Categoria de veículo | `GET /api/veiculos?categoria=TRUCK` | Aplica `categoria` no `where` do Prisma; sem o parâmetro, não restringe | `tests/veiculo.service.test.js` |
+| Categoria de veículo | Veículo cadastrado antes da coluna existir | Entra como `OUTRO` ("não categorizado") pelo `DEFAULT` da migration, sem quebrar a listagem | `prisma/migrations/20261107120000_categoria_veiculo` |
+| Categoria de veículo | Filtrar a listagem pela categoria na interface | O select de categoria dispara a consulta com `categoria` no `params` | `src/pages/Veiculos/index.test.tsx` (frontend) |
+| Importação de motoristas | `POST /api/motoristas/importar` com planilha válida | `201` com `{ importados: N }`; grava tudo num `createMany` só | `tests/motorista.service.test.js` |
+| Importação de motoristas | Uma linha inválida no meio do arquivo | `422` com a lista completa de problemas e **nada gravado** — é tudo ou nada | `tests/motorista.service.test.js` |
+| Importação de motoristas | CNH repetida dentro do próprio arquivo | `422` apontando a linha do par duplicado | `tests/motorista.service.test.js` |
+| Importação de motoristas | CNH que já existe no sistema | `422` com o nome do motorista já cadastrado | `tests/motorista.service.test.js` |
+| Importação de motoristas | Lote com N linhas | Uma consulta só ao banco para checar todas as CNHs (não N consultas) | `tests/motorista.service.test.js` |
+| Importação de motoristas | Mais de 500 linhas | `422` pelo `importarMotoristasSchema` — o lote roda numa transação só | `src/validators/motorista.validators.js` |
+| Importação de motoristas | Arquivo sem a coluna "Nome", ou que não abre | Mensagem explicando o que falta, sem chamar a API | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Importação de motoristas | Erro devolvido pela API com índice do array | A tela mostra o número da **linha da planilha** (índice 1 → linha 3), que é o que o usuário vê no Excel | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Importação de motoristas | Baixar o modelo `.xlsx` | Gera o arquivo com a aba de preenchimento e a aba de instruções | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Rotas do dia | `GET /api/relatorios/rotas-do-dia?data=AAAA-MM-DD` | Lista as rotas do dia em ordem cronológica, com `totalRotas`, `totalEntregas` e `entregasConcluidas` | `tests/relatorio.service.test.js` |
+| Rotas do dia | Recorte do dia | Dia civil no fuso de operação (UTC-3), não em UTC: `2026-11-07` vai de `03:00Z` a `02:59:59.999Z` do dia seguinte — uma rota das 22h fica no dia dela | `tests/relatorio.service.test.js` |
+| Rotas do dia | `base=criadoEm` | Conta pelo cadastro no sistema em vez do horário da rota ("carregadas no dia" tem as duas leituras no uso real) | `tests/relatorio.service.test.js` |
+| Rotas do dia | Dia sem nenhuma rota | Totais zerados e lista vazia, não erro | `tests/relatorio.service.test.js` |
+| Rotas do dia | Horário exibido na tela | Formatado em `America/Sao_Paulo`, para bater com o dia que o backend recortou mesmo se o navegador estiver em outro fuso | `src/pages/RotasDoDia/formato.test.ts` (frontend) |
+| Rotas do dia | Exportar Excel | Exporta exatamente o relatório que está na tela, inclusive a visão escolhida; o botão fica desabilitado num dia sem rotas | `src/pages/RotasDoDia/index.test.tsx` (frontend) |
+
+> As bibliotecas de planilha (`read-excel-file`, `write-excel-file`) entram por `import()`
+> dinâmico. Isso mantém o bundle principal praticamente do mesmo tamanho — importa porque
+> o motorista acessa o sistema pelo celular, e esses ~145 kB não servem a ele.
+
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
 | Regra | Caso de teste | Resultado esperado | Cobertura |

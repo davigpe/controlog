@@ -10,6 +10,7 @@ import {
   ClipboardList,
   BarChart2,
   UserCog,
+  CalendarDays,
 } from 'lucide-react'
 import { Logo, LogoSimbolo } from '@/components/shared/Logo'
 import { PERFIS_GESTAO, type Perfil } from '@/lib/perfil'
@@ -27,6 +28,7 @@ const navItems: { to: string; icon: typeof Truck; label: string; perfis: Perfil[
   { to: '/otimizacao-rotas',  icon: Route,           label: 'Otimização de Rotas', perfis: PERFIS_GESTAO },
   { to: '/pedidos',           icon: Package,         label: 'Pedidos',             perfis: PERFIS_GESTAO },
   { to: '/planos',            icon: ClipboardList,   label: 'Planos',              perfis: PERFIS_GESTAO },
+  { to: '/rotas-do-dia',      icon: CalendarDays,    label: 'Rotas do Dia',        perfis: PERFIS_GESTAO },
   { to: '/relatorios',        icon: BarChart2,       label: 'Relatórios',          perfis: PERFIS_GESTAO },
 ]
 
