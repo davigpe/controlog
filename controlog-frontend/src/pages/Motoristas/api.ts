@@ -43,6 +43,15 @@ export function useCriarAcessoMotorista() {
   });
 }
 
+export function useImportarMotoristas() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (motoristas: MotoristaInput[]) =>
+      (await api.post<{ importados: number }>('/motoristas/importar', { motoristas })).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['motoristas'] }),
+  });
+}
+
 export function useDeleteMotorista() {
   const queryClient = useQueryClient();
   return useMutation({

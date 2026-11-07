@@ -17,6 +17,7 @@ import Pedidos from './pages/Pedidos'
 import Planos from './pages/Planos'
 import PlanoDetalhe from './pages/PlanoDetalhe'
 import Relatorios from './pages/Relatorios'
+import RotasDoDia from './pages/RotasDoDia'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="planos" element={<Planos />} />
             <Route path="planos/:id" element={<PlanoDetalhe />} />
             <Route path="relatorios" element={<Relatorios />} />
+            <Route path="rotas-do-dia" element={<RotasDoDia />} />
           </Route>
         </Route>
       </Routes>

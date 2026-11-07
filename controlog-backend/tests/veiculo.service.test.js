@@ -141,4 +141,52 @@ describe('veiculo.service', () => {
 
     expect(veiculo.modelo).toBe('Sprinter 2.0');
   });
+  // Categoria operacional (VUC, van, truck...) — pedida na avaliação com
+  // usuários da área de logística.
+  test('create devolve a categoria informada', async () => {
+    const prisma = buildPrismaMock();
+    prisma.veiculo.create.mockResolvedValue({
+      id: 'v1',
+      placa: 'PQR-1122',
+      modelo: 'Iveco Daily',
+      capacidade: '1.800 kg',
+      categoria: 'VUC',
+      status: 'DISPONIVEL',
+      criadoEm: new Date(),
+    });
+
+    const service = createVeiculoService(prisma);
+    const veiculo = await service.create({
+      placa: 'PQR-1122',
+      modelo: 'Iveco Daily',
+      capacidade: '1.800 kg',
+      categoria: 'VUC',
+    });
+
+    expect(veiculo.categoria).toBe('VUC');
+  });
+
+  test('list filtra por categoria', async () => {
+    const prisma = buildPrismaMock();
+    prisma.veiculo.findMany.mockResolvedValue([]);
+    prisma.veiculo.count.mockResolvedValue(0);
+
+    const service = createVeiculoService(prisma);
+    await service.list({ categoria: 'TRUCK' });
+
+    expect(prisma.veiculo.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ categoria: 'TRUCK' }) })
+    );
+  });
+
+  test('list sem categoria não restringe o filtro', async () => {
+    const prisma = buildPrismaMock();
+    prisma.veiculo.findMany.mockResolvedValue([]);
+    prisma.veiculo.count.mockResolvedValue(0);
+
+    const service = createVeiculoService(prisma);
+    await service.list({});
+
+    expect(prisma.veiculo.findMany.mock.calls[0][0].where.categoria).toBeUndefined();
+  });
 });

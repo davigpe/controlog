@@ -57,12 +57,12 @@ async function main() {
 
   // ─── Veículos ───────────────────────────────────────────────────────────
   const veiculosSeed = [
-    { key: 'sprinter', placa: 'ABC-1234', modelo: 'Mercedes Sprinter', capacidade: '1.500 kg' },
-    { key: 'volvo', placa: 'DEF-5678', modelo: 'Volvo FH', capacidade: '25.000 kg' },
-    { key: 'scania', placa: 'GHI-9012', modelo: 'Scania R450', capacidade: '30.000 kg' },
-    { key: 'cargo', placa: 'JKL-3456', modelo: 'Ford Cargo 1723', capacidade: '8.000 kg' },
-    { key: 'constellation', placa: 'MNO-7890', modelo: 'VW Constellation 24.280', capacidade: '15.000 kg', status: 'MANUTENCAO' },
-    { key: 'daily', placa: 'PQR-1122', modelo: 'Iveco Daily', capacidade: '1.800 kg' },
+    { key: 'sprinter', placa: 'ABC-1234', modelo: 'Mercedes Sprinter', capacidade: '1.500 kg', categoria: 'VAN' },
+    { key: 'volvo', placa: 'DEF-5678', modelo: 'Volvo FH', capacidade: '25.000 kg', categoria: 'CARRETA' },
+    { key: 'scania', placa: 'GHI-9012', modelo: 'Scania R450', capacidade: '30.000 kg', categoria: 'CARRETA' },
+    { key: 'cargo', placa: 'JKL-3456', modelo: 'Ford Cargo 1723', capacidade: '8.000 kg', categoria: 'TOCO' },
+    { key: 'constellation', placa: 'MNO-7890', modelo: 'VW Constellation 24.280', capacidade: '15.000 kg', categoria: 'TRUCK', status: 'MANUTENCAO' },
+    { key: 'daily', placa: 'PQR-1122', modelo: 'Iveco Daily', capacidade: '1.800 kg', categoria: 'VUC' },
   ];
 
   const veiculos = {};
@@ -70,7 +70,13 @@ async function main() {
     veiculos[v.key] = await prisma.veiculo.upsert({
       where: { placa: v.placa },
       update: {},
-      create: { placa: v.placa, modelo: v.modelo, capacidade: v.capacidade, status: v.status ?? 'DISPONIVEL' },
+      create: {
+        placa: v.placa,
+        modelo: v.modelo,
+        capacidade: v.capacidade,
+        categoria: v.categoria,
+        status: v.status ?? 'DISPONIVEL',
+      },
     });
   }
 

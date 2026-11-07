@@ -59,7 +59,7 @@ cadastro do motorista.
 
 | Grupo de rotas | Perfis permitidos |
 |---|---|
-| `/api/minhas-rotas` (listagem e `PATCH .../entregas/:id/concluir`) | `MOTORISTA` |
+| `/api/minhas-rotas` (listagem, `PATCH .../entregas/:id/concluir` e `.../insucesso`) | `MOTORISTA` |
 | `/api/motoristas`, `/veiculos`, `/rotas`, `/entregas`, `/dashboard`, `/relatorios`, `/otimizacao-rotas`, `/pedidos`, `/planos` | `GESTOR`, `OPERADOR` |
 | `POST /api/motoristas/:id/acesso` | `GESTOR` |
 
@@ -190,10 +190,46 @@ práticas de segurança/escalabilidade:
 | Conclusão de entrega | `PATCH /api/minhas-rotas/entregas/:id/concluir` | Marca a entrega como `ENTREGUE` e grava `dataEfetiva`; funciona a partir de `PENDENTE` ou `EM_TRANSITO` | `tests/minhasRotas.service.test.js` |
 | Conclusão de entrega | Motorista tenta concluir entrega de outro motorista | `403 Forbidden` — a posse é checada no service, não só pelo perfil da rota HTTP (o id vem da requisição) | `tests/minhasRotas.service.test.js` |
 | Conclusão de entrega | Concluir entrega já `ENTREGUE` / já `CANCELADA` | `409 Conflict` / `422 Unprocessable Entity` | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | `PATCH /api/minhas-rotas/entregas/:id/insucesso` | Marca `NAO_ENTREGUE` com `motivoInsucesso`, `observacao` e `dataEfetiva` da tentativa | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Motorista registra insucesso em entrega de outro | `403 Forbidden` — mesma checagem de posse da conclusão | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Insucesso em entrega já `ENTREGUE` / já `NAO_ENTREGUE` | `409 Conflict` nos dois casos | `tests/minhasRotas.service.test.js` |
+| Registro de insucesso | Motivo `OUTRO` sem observação | `422 Unprocessable Entity` — "outro" sem descrição não informa quem vai tratar a entrega | `src/validators/minhasRotas.validators.js` |
+| Segunda tentativa | Concluir uma entrega que está `NAO_ENTREGUE` | Permitido: o motorista pode voltar ao endereço e entregar | `tests/minhasRotas.service.test.js` |
 | Atribuição de rota | `PUT /api/rotas/:id` trocando `motoristaId` | As entregas da rota são movidas para o novo motorista na mesma transação — sem isso o motorista antigo continuaria vendo as entregas como dele | `tests/rota.service.test.js` |
 | Atribuição de rota | `PUT /api/rotas/:id` sem trocar o motorista | Nenhuma entrega é tocada | `tests/rota.service.test.js` |
 | Atribuição de rota | `GET /api/rotas` | Cada rota traz `totalEntregas` e `entregasPendentes` (`PENDENTE` + `EM_TRANSITO`), usados na tela de atribuição | `tests/rota.service.test.js` |
 | Separação por perfil | Token de `MOTORISTA` em `/api/rotas`, `/motoristas`, `/planos`, `/dashboard`; token de `GESTOR` em `/api/minhas-rotas` | `403 Forbidden` nos dois sentidos — cada perfil só alcança o próprio grupo de rotas | `tests/app.test.js`, `tests/auth.middleware.test.js` |
+
+### 3.2 Melhorias vindas da avaliação com usuários da área de logística
+
+Sugestões levantadas por profissionais de logística que usaram o sistema e devolveram
+feedback. Não estavam no RFC: vieram do uso real.
+
+| ID | Caso de teste | Resultado esperado | Cobertura |
+|---|---|---|---|
+| Categoria de veículo | Cadastrar veículo informando `categoria` | Persiste e devolve a categoria (`MOTO`, `PASSEIO`, `UTILITARIO`, `VAN`, `VUC`, `TRES_QUARTOS`, `TOCO`, `TRUCK`, `CARRETA`, `OUTRO`) | `tests/veiculo.service.test.js` |
+| Categoria de veículo | `GET /api/veiculos?categoria=TRUCK` | Aplica `categoria` no `where` do Prisma; sem o parâmetro, não restringe | `tests/veiculo.service.test.js` |
+| Categoria de veículo | Veículo cadastrado antes da coluna existir | Entra como `OUTRO` ("não categorizado") pelo `DEFAULT` da migration, sem quebrar a listagem | `prisma/migrations/20261107120000_categoria_veiculo` |
+| Categoria de veículo | Filtrar a listagem pela categoria na interface | O select de categoria dispara a consulta com `categoria` no `params` | `src/pages/Veiculos/index.test.tsx` (frontend) |
+| Importação de motoristas | `POST /api/motoristas/importar` com planilha válida | `201` com `{ importados: N }`; grava tudo num `createMany` só | `tests/motorista.service.test.js` |
+| Importação de motoristas | Uma linha inválida no meio do arquivo | `422` com a lista completa de problemas e **nada gravado** — é tudo ou nada | `tests/motorista.service.test.js` |
+| Importação de motoristas | CNH repetida dentro do próprio arquivo | `422` apontando a linha do par duplicado | `tests/motorista.service.test.js` |
+| Importação de motoristas | CNH que já existe no sistema | `422` com o nome do motorista já cadastrado | `tests/motorista.service.test.js` |
+| Importação de motoristas | Lote com N linhas | Uma consulta só ao banco para checar todas as CNHs (não N consultas) | `tests/motorista.service.test.js` |
+| Importação de motoristas | Mais de 500 linhas | `422` pelo `importarMotoristasSchema` — o lote roda numa transação só | `src/validators/motorista.validators.js` |
+| Importação de motoristas | Arquivo sem a coluna "Nome", ou que não abre | Mensagem explicando o que falta, sem chamar a API | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Importação de motoristas | Erro devolvido pela API com índice do array | A tela mostra o número da **linha da planilha** (índice 1 → linha 3), que é o que o usuário vê no Excel | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Importação de motoristas | Baixar o modelo `.xlsx` | Gera o arquivo com a aba de preenchimento e a aba de instruções | `src/pages/Motoristas/importacao.test.tsx` (frontend) |
+| Rotas do dia | `GET /api/relatorios/rotas-do-dia?data=AAAA-MM-DD` | Lista as rotas do dia em ordem cronológica, com `totalRotas`, `totalEntregas` e `entregasConcluidas` | `tests/relatorio.service.test.js` |
+| Rotas do dia | Recorte do dia | Dia civil no fuso de operação (UTC-3), não em UTC: `2026-11-07` vai de `03:00Z` a `02:59:59.999Z` do dia seguinte — uma rota das 22h fica no dia dela | `tests/relatorio.service.test.js` |
+| Rotas do dia | `base=criadoEm` | Conta pelo cadastro no sistema em vez do horário da rota ("carregadas no dia" tem as duas leituras no uso real) | `tests/relatorio.service.test.js` |
+| Rotas do dia | Dia sem nenhuma rota | Totais zerados e lista vazia, não erro | `tests/relatorio.service.test.js` |
+| Rotas do dia | Horário exibido na tela | Formatado em `America/Sao_Paulo`, para bater com o dia que o backend recortou mesmo se o navegador estiver em outro fuso | `src/pages/RotasDoDia/formato.test.ts` (frontend) |
+| Rotas do dia | Exportar Excel | Exporta exatamente o relatório que está na tela, inclusive a visão escolhida; o botão fica desabilitado num dia sem rotas | `src/pages/RotasDoDia/index.test.tsx` (frontend) |
+
+> As bibliotecas de planilha (`read-excel-file`, `write-excel-file`) entram por `import()`
+> dinâmico. Isso mantém o bundle principal praticamente do mesmo tamanho — importa porque
+> o motorista acessa o sistema pelo celular, e esses ~145 kB não servem a ele.
 
 ## 4. Casos de teste das regras de negócio (RN01–RN08)
 
@@ -225,6 +261,7 @@ práticas de segurança/escalabilidade:
 | Perfis | Sidebar mostra só "Minhas Rotas" para o motorista e esconde esse link dos perfis de gestão | `src/components/layout/Sidebar.test.tsx` |
 | Visão do motorista | Lista as rotas atribuídas com veículo e entregas, conta rotas/entregas/pendentes no resumo, filtra por status reconsultando a API, e trata lista vazia e erro de carregamento | `src/pages/MinhasRotas/index.test.tsx` |
 | Conclusão de entrega | Botão "Concluir" chama a API e mostra o toast; entrega já concluída não oferece o botão; erro da API aparece com a mensagem do backend | `src/pages/MinhasRotas/index.test.tsx` |
+| Registro de insucesso | O modal envia motivo e observação; `OUTRO` mantém "Registrar insucesso" desabilitado até a observação ser preenchida; entrega concluída não oferece o botão; entrega `NAO_ENTREGUE` mostra motivo e observação e ainda permite concluir | `src/pages/MinhasRotas/index.test.tsx` |
 | Atribuição de rotas | Lista as rotas aprovadas com responsável e contagem de entregas, abre filtrando por `ATIVA`, troca de filtro reconsulta a API, e estado vazio explica que rotas vêm da aprovação de um plano | `src/pages/Atribuicoes/index.test.tsx` |
 | Atribuição de rotas | Trocar o motorista no modal envia o novo `motoristaId` via `PUT /rotas/:id`; "Salvar" fica desabilitado enquanto nada muda; o modal avisa quantas entregas pendentes vão junto; erro da API aparece com a mensagem do backend | `src/pages/Atribuicoes/index.test.tsx` |
 | Acesso do motorista | Gestor cria o acesso pelo modal (`POST /motoristas/:id/acesso`) e vê o toast de sucesso; operador não vê a ação; motorista que já tem login também não | `src/pages/Motoristas/index.test.tsx` |

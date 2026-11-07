@@ -9,12 +9,19 @@ import EntregaFormModal from './EntregaFormModal'
 import { useCreateEntrega, useDeleteEntrega, useEntregas, useUpdateEntrega } from './api'
 import type { Entrega, EntregaInput, StatusEntrega } from './types'
 
-const statusOptions: StatusEntrega[] = ['PENDENTE', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA']
+const statusOptions: StatusEntrega[] = [
+  'PENDENTE',
+  'EM_TRANSITO',
+  'ENTREGUE',
+  'NAO_ENTREGUE',
+  'CANCELADA',
+]
 
 const statusStyle: Record<StatusEntrega, string> = {
   ENTREGUE: 'bg-green-100 text-green-700',
   EM_TRANSITO: 'bg-yellow-100 text-yellow-700',
   PENDENTE: 'bg-red-100 text-red-700',
+  NAO_ENTREGUE: 'bg-amber-100 text-amber-800',
   CANCELADA: 'bg-gray-100 text-gray-700',
 }
 
@@ -22,6 +29,7 @@ const statusLabel: Record<StatusEntrega, string> = {
   PENDENTE: 'Pendente',
   EM_TRANSITO: 'Em Trânsito',
   ENTREGUE: 'Entregue',
+  NAO_ENTREGUE: 'Não entregue',
   CANCELADA: 'Cancelada',
 }
 

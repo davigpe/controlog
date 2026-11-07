@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type PaginatedResponse } from '@/lib/api';
-import type { StatusVeiculo, Veiculo, VeiculoInput } from './types';
+import type { CategoriaVeiculo, StatusVeiculo, Veiculo, VeiculoInput } from './types';
 
 interface ListParams {
   busca?: string;
   status?: StatusVeiculo;
+  categoria?: CategoriaVeiculo;
   emRota?: boolean;
   page?: number;
   pageSize?: number;

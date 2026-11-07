@@ -7,6 +7,7 @@ import { createMotoristaService } from '../services/motorista.service.js';
 import {
   createMotoristaSchema,
   criarAcessoMotoristaSchema,
+  importarMotoristasSchema,
   listMotoristasQuerySchema,
   updateMotoristaSchema,
 } from '../validators/motorista.validators.js';
@@ -19,6 +20,15 @@ export const motoristasRouter = Router();
 motoristasRouter.get('/', validate(listMotoristasQuerySchema, 'query'), controller.list);
 motoristasRouter.get('/:id', controller.getById);
 motoristasRouter.post('/', validate(createMotoristaSchema), controller.create);
+
+// Importação em lote: cadastra a planilha inteira numa tacada. Fica antes de
+// '/:id' só por clareza de leitura — Express casa '/importar' com este
+// handler de qualquer forma, por ser POST numa rota sem parâmetro.
+motoristasRouter.post(
+  '/importar',
+  validate(importarMotoristasSchema),
+  controller.importar
+);
 motoristasRouter.put('/:id', validate(updateMotoristaSchema), controller.update);
 motoristasRouter.delete('/:id', controller.remove);
 

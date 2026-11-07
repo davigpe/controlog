@@ -32,6 +32,23 @@ enum VeiculoStatus {
   INATIVO
 }
 
+// Categoria operacional do veículo — é por ela que a logística decide o que
+// cabe em qual carro. Fechada em enum, e não texto livre no modelo, porque
+// vira critério de filtro e de agrupamento: "VUC" digitado de cinco jeitos
+// não agrega. Ordenada do menor porte ao maior.
+enum VeiculoCategoria {
+  MOTO
+  PASSEIO
+  UTILITARIO
+  VAN
+  VUC
+  TRES_QUARTOS
+  TOCO
+  TRUCK
+  CARRETA
+  OUTRO
+}
+
 enum RotaStatus {
   ATIVA
   CONCLUIDA
@@ -42,7 +59,21 @@ enum EntregaStatus {
   PENDENTE
   EM_TRANSITO
   ENTREGUE
+  // Tentativa feita e frustrada — diferente de CANCELADA, que é o pedido
+  // cancelado antes de sair. O motorista registra, e cabe ao gestor decidir o
+  // destino da entrega (reatribuir a outra rota, reagendar ou cancelar).
+  NAO_ENTREGUE
   CANCELADA
+}
+
+// Motivos fechados em enum em vez de texto livre para que o relatório consiga
+// agrupar por causa — "cliente ausente" digitado de dez jeitos não agrega.
+enum MotivoInsucesso {
+  CLIENTE_AUSENTE
+  ENDERECO_NAO_ENCONTRADO
+  RECUSADA_PELO_CLIENTE
+  AVARIA
+  OUTRO
 }
 
 enum PlanoStatus {
@@ -51,14 +82,14 @@ enum PlanoStatus {
 }
 
 model Usuario {
-  id                  String        @id @default(uuid())
-  nome                String
-  email               String        @unique
-  senhaHash           String        @map("senha_hash")
-  perfil              UsuarioPerfil @default(OPERADOR)
-  resetTokenHash      String?       @map("reset_token_hash")
-  resetTokenExpiraEm  DateTime?     @map("reset_token_expira_em")
-  criadoEm            DateTime      @default(now()) @map("criado_em")
+  id                 String        @id @default(uuid())
+  nome               String
+  email              String        @unique
+  senhaHash          String        @map("senha_hash")
+  perfil             UsuarioPerfil @default(OPERADOR)
+  resetTokenHash     String?       @map("reset_token_hash")
+  resetTokenExpiraEm DateTime?     @map("reset_token_expira_em")
+  criadoEm           DateTime      @default(now()) @map("criado_em")
 
   // Preenchido só em usuários de perfil MOTORISTA — é por aqui que a visão
   // restrita ("minhas rotas") descobre de qual Motorista o usuário logado é.
@@ -68,12 +99,12 @@ model Usuario {
 }
 
 model Motorista {
-  id        String          @id @default(uuid())
-  nome      String
-  cnh       String          @unique
-  telefone  String
-  status    MotoristaStatus @default(ATIVO)
-  criadoEm  DateTime        @default(now()) @map("criado_em")
+  id       String          @id @default(uuid())
+  nome     String
+  cnh      String          @unique
+  telefone String
+  status   MotoristaStatus @default(ATIVO)
+  criadoEm DateTime        @default(now()) @map("criado_em")
 
   // Null enquanto o motorista não tem acesso ao sistema — um gestor cria o
   // login depois (POST /api/motoristas/:id/acesso). onDelete: SetNull para
@@ -88,12 +119,16 @@ model Motorista {
 }
 
 model Veiculo {
-  id          String        @id @default(uuid())
-  placa       String        @unique
-  modelo      String
-  capacidade  String
-  status      VeiculoStatus @default(DISPONIVEL)
-  criadoEm    DateTime      @default(now()) @map("criado_em")
+  id         String           @id @default(uuid())
+  placa      String           @unique
+  modelo     String
+  capacidade String
+  // Default OUTRO para que os veículos cadastrados antes desta coluna sigam
+  // válidos — "não categorizado" é um estado honesto, melhor do que chutar
+  // uma categoria errada para a base que já existe.
+  categoria  VeiculoCategoria @default(OUTRO)
+  status     VeiculoStatus    @default(DISPONIVEL)
+  criadoEm   DateTime         @default(now()) @map("criado_em")
 
   rotas Rota[]
 
@@ -101,17 +136,17 @@ model Veiculo {
 }
 
 model Rota {
-  id             String     @id @default(uuid())
-  codigo         String     @unique
-  origem         String
-  destino        String
-  latOrigem      Float      @map("lat_origem")
-  lngOrigem      Float      @map("lng_origem")
-  latDestino     Float      @map("lat_destino")
-  lngDestino     Float      @map("lng_destino")
-  status         RotaStatus @default(ATIVA)
-  dataHora       DateTime   @map("data_hora")
-  criadoEm       DateTime   @default(now()) @map("criado_em")
+  id         String     @id @default(uuid())
+  codigo     String     @unique
+  origem     String
+  destino    String
+  latOrigem  Float      @map("lat_origem")
+  lngOrigem  Float      @map("lng_origem")
+  latDestino Float      @map("lat_destino")
+  lngDestino Float      @map("lng_destino")
+  status     RotaStatus @default(ATIVA)
+  dataHora   DateTime   @map("data_hora")
+  criadoEm   DateTime   @default(now()) @map("criado_em")
 
   motoristaId String    @map("motorista_id")
   motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
@@ -126,13 +161,19 @@ model Rota {
 }
 
 model Entrega {
-  id            String        @id @default(uuid())
-  codigo        String        @unique
-  destino       String
-  status        EntregaStatus @default(PENDENTE)
-  dataPrevista  DateTime      @map("data_prevista")
-  dataEfetiva   DateTime?     @map("data_efetiva")
-  criadoEm      DateTime      @default(now()) @map("criado_em")
+  id              String           @id @default(uuid())
+  codigo          String           @unique
+  destino         String
+  status          EntregaStatus    @default(PENDENTE)
+  dataPrevista    DateTime         @map("data_prevista")
+  // Quando a entrega chegou ao estado final — preenchida tanto na conclusão
+  // quanto no registro de insucesso, que também encerra a tentativa.
+  dataEfetiva     DateTime?        @map("data_efetiva")
+  // Só preenchidos em NAO_ENTREGUE. A observação é livre porque o motivo
+  // fechado nunca cobre o caso concreto ("portaria recusou sem síndico").
+  motivoInsucesso MotivoInsucesso? @map("motivo_insucesso")
+  observacao      String?
+  criadoEm        DateTime         @default(now()) @map("criado_em")
 
   rotaId String @map("rota_id")
   rota   Rota   @relation(fields: [rotaId], references: [id], onDelete: Restrict)
@@ -158,21 +199,21 @@ model Plano {
 // relação com o ERP real nem com o model Entrega (que já representa entregas
 // de verdade vinculadas a Rota/Motorista, com suas próprias regras de negócio).
 model Pedido {
-  id        String   @id @default(uuid())
-  codigo    String   @unique
-  cliente   String
-  endereco  String
-  cidade    String
-  lat       Float
-  lng       Float
-  unidades  Int
-  volumeM3  Float    @map("volume_m3")
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  id       String   @id @default(uuid())
+  codigo   String   @unique
+  cliente  String
+  endereco String
+  cidade   String
+  lat      Float
+  lng      Float
+  unidades Int
+  volumeM3 Float    @map("volume_m3")
+  criadoEm DateTime @default(now()) @map("criado_em")
 
-  planoId   String?  @map("plano_id")
-  plano     Plano?   @relation(fields: [planoId], references: [id], onDelete: SetNull)
+  planoId   String? @map("plano_id")
+  plano     Plano?  @relation(fields: [planoId], references: [id], onDelete: SetNull)
   // Grupo (1, 2, 3...) atribuído ao otimizar o plano — null até otimizar.
-  rotaIndex Int?     @map("rota_index")
+  rotaIndex Int?    @map("rota_index")
 
   // Preenchido quando o grupo (rotaIndex) é aprovado e vira uma Rota real —
   // null enquanto o grupo ainda não foi aprovado.

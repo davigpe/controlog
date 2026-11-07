@@ -7,6 +7,7 @@ function toResponse(veiculo, extras = {}) {
     placa: veiculo.placa,
     modelo: veiculo.modelo,
     capacidade: veiculo.capacidade,
+    categoria: veiculo.categoria,
     status: veiculo.status,
     criadoEm: veiculo.criadoEm,
     ...extras,
@@ -15,9 +16,10 @@ function toResponse(veiculo, extras = {}) {
 
 export function createVeiculoService(prisma) {
   return {
-    async list({ busca, status, emRota, page = 1, pageSize = 10 } = {}) {
+    async list({ busca, status, categoria, emRota, page = 1, pageSize = 10 } = {}) {
       const where = {
         status: status ?? undefined,
+        categoria: categoria ?? undefined,
         ...(emRota === true ? { rotas: { some: { status: 'ATIVA' } } } : {}),
         ...(emRota === false ? { rotas: { none: { status: 'ATIVA' } } } : {}),
         ...(busca

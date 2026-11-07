@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Calendar, CheckCircle, Clock, MapPin, Package, Truck, XCircle } from 'lucide-react'
+import { AlertTriangle, Calendar, CheckCircle, Clock, MapPin, Package, Truck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
-import { useConcluirEntrega, useMinhasRotas } from './api'
-import type { StatusEntrega, StatusRota } from './types'
+import { useConcluirEntrega, useMinhasRotas, useRegistrarInsucesso } from './api'
+import InsucessoModal from './InsucessoModal'
+import { MOTIVO_INSUCESSO_LABEL } from './insucesso'
+import type { EntregaDaRota, MotivoInsucesso, StatusEntrega, StatusRota } from './types'
 
 const filtros: { label: string; valor: StatusRota | 'Todas' }[] = [
   { label: 'Todas',      valor: 'Todas' },
@@ -28,6 +30,7 @@ const entregaStatusStyle: Record<StatusEntrega, string> = {
   PENDENTE:    'bg-yellow-100 text-yellow-700',
   EM_TRANSITO: 'bg-blue-100 text-blue-700',
   ENTREGUE:    'bg-green-100 text-green-700',
+  NAO_ENTREGUE:'bg-amber-100 text-amber-800',
   CANCELADA:   'bg-red-100 text-red-700',
 }
 
@@ -35,6 +38,7 @@ const entregaStatusLabel: Record<StatusEntrega, string> = {
   PENDENTE: 'Pendente',
   EM_TRANSITO: 'Em trânsito',
   ENTREGUE: 'Entregue',
+  NAO_ENTREGUE: 'Não entregue',
   CANCELADA: 'Cancelada',
 }
 
@@ -42,6 +46,7 @@ const entregaStatusIcon: Record<StatusEntrega, React.ReactNode> = {
   PENDENTE:    <Clock size={13} />,
   EM_TRANSITO: <Truck size={13} />,
   ENTREGUE:    <CheckCircle size={13} />,
+  NAO_ENTREGUE:<AlertTriangle size={13} />,
   CANCELADA:   <XCircle size={13} />,
 }
 
@@ -49,6 +54,8 @@ export default function MinhasRotas() {
   const [filtro, setFiltro] = useState<StatusRota | 'Todas'>('Todas')
   const { data, isLoading, isError } = useMinhasRotas(filtro === 'Todas' ? undefined : filtro)
   const concluirMutation = useConcluirEntrega()
+  const insucessoMutation = useRegistrarInsucesso()
+  const [entregaInsucesso, setEntregaInsucesso] = useState<EntregaDaRota | null>(null)
 
   const rotas = data?.rotas ?? []
   const totalEntregas = rotas.reduce((soma, rota) => soma + rota.entregas.length, 0)
@@ -56,6 +63,18 @@ export default function MinhasRotas() {
     (soma, rota) => soma + rota.entregas.filter((e) => e.status === 'PENDENTE' || e.status === 'EM_TRANSITO').length,
     0
   )
+
+  function handleInsucesso(dados: { motivo: MotivoInsucesso; observacao?: string }) {
+    if (!entregaInsucesso) return
+    const { id, codigo } = entregaInsucesso
+    insucessoMutation
+      .mutateAsync({ entregaId: id, ...dados })
+      .then(() => {
+        toast.success(`Insucesso registrado na entrega ${codigo}.`)
+        setEntregaInsucesso(null)
+      })
+      .catch((error) => toast.error(getErrorMessage(error, 'Não foi possível registrar o insucesso.')))
+  }
 
   function handleConcluir(entregaId: string, codigo: string) {
     concluirMutation
@@ -160,14 +179,18 @@ export default function MinhasRotas() {
                         <span className="text-gray-600 min-w-0 flex-1 truncate">{entrega.destino}</span>
                         <span className="text-xs text-gray-600 shrink-0">
                           {entrega.dataEfetiva
-                            ? `Entregue em ${new Date(entrega.dataEfetiva).toLocaleDateString('pt-BR')}`
+                            ? `${entrega.status === 'NAO_ENTREGUE' ? 'Tentativa em' : 'Entregue em'} ${new Date(entrega.dataEfetiva).toLocaleDateString('pt-BR')}`
                             : new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')}
                         </span>
                         <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${entregaStatusStyle[entrega.status]}`}>
                           {entregaStatusIcon[entrega.status]}
                           {entregaStatusLabel[entrega.status]}
                         </span>
-                        {(entrega.status === 'PENDENTE' || entrega.status === 'EM_TRANSITO') && (
+                        {/* NAO_ENTREGUE continua aceitando conclusão: o motorista
+                            pode voltar ao endereço e entregar na segunda tentativa. */}
+                        {(entrega.status === 'PENDENTE' ||
+                          entrega.status === 'EM_TRANSITO' ||
+                          entrega.status === 'NAO_ENTREGUE') && (
                           <button
                             onClick={() => handleConcluir(entrega.id, entrega.codigo)}
                             disabled={concluirMutation.isPending}
@@ -177,6 +200,22 @@ export default function MinhasRotas() {
                             <CheckCircle size={13} />
                             Concluir
                           </button>
+                        )}
+                        {(entrega.status === 'PENDENTE' || entrega.status === 'EM_TRANSITO') && (
+                          <button
+                            onClick={() => setEntregaInsucesso(entrega)}
+                            aria-label={`Registrar insucesso na entrega ${entrega.codigo}`}
+                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-600 text-amber-700 hover:bg-amber-50 transition-colors"
+                          >
+                            <AlertTriangle size={13} />
+                            Não entregue
+                          </button>
+                        )}
+                        {entrega.motivoInsucesso && (
+                          <p className="w-full text-xs text-amber-800">
+                            {MOTIVO_INSUCESSO_LABEL[entrega.motivoInsucesso]}
+                            {entrega.observacao ? ` — ${entrega.observacao}` : ''}
+                          </p>
                         )}
                       </li>
                     ))}
@@ -188,6 +227,13 @@ export default function MinhasRotas() {
           ))}
         </div>
       )}
+
+      <InsucessoModal
+        entrega={entregaInsucesso}
+        onClose={() => setEntregaInsucesso(null)}
+        onSave={handleInsucesso}
+        saving={insucessoMutation.isPending}
+      />
     </div>
   )
 }

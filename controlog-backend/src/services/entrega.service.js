@@ -14,6 +14,8 @@ function toResponse(entrega) {
     status: entrega.status,
     dataPrevista: entrega.dataPrevista,
     dataEfetiva: entrega.dataEfetiva,
+    motivoInsucesso: entrega.motivoInsucesso ?? null,
+    observacao: entrega.observacao ?? null,
     criadoEm: entrega.criadoEm,
     rota: entrega.rota,
     motorista: entrega.motorista,

@@ -11,5 +11,14 @@ export function createMinhasRotasController(minhasRotasService) {
       const entrega = await minhasRotasService.concluirEntrega(req.user.id, req.params.id);
       res.json(entrega);
     }),
+
+    registrarInsucesso: asyncHandler(async (req, res) => {
+      const entrega = await minhasRotasService.registrarInsucesso(
+        req.user.id,
+        req.params.id,
+        req.body
+      );
+      res.json(entrega);
+    }),
   };
 }

@@ -1,0 +1,26 @@
+{
+  "name": "controlog",
+  "version": "1.5.0",
+  "private": true,
+  "description": "Controlog — scripts de conveniência da raiz do monorepo (API + interface web)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:sem-banco": "node scripts/dev.mjs --sem-banco",
+    "dev:api": "npm run dev --prefix controlog-backend",
+    "dev:web": "npm run dev --prefix controlog-frontend",
+    "db:up": "docker compose -f controlog-backend/docker-compose.yml up -d --wait",
+    "db:down": "docker compose -f controlog-backend/docker-compose.yml down",
+    "db:seed": "npm run prisma:seed --prefix controlog-backend",
+    "db:studio": "npm run prisma:studio --prefix controlog-backend",
+    "install:all": "npm install --prefix controlog-backend && npm install --prefix controlog-frontend",
+    "test": "npm test --prefix controlog-backend && npm test --prefix controlog-frontend",
+    "test:api": "npm test --prefix controlog-backend",
+    "test:web": "npm test --prefix controlog-frontend",
+    "lint": "npm run lint --prefix controlog-frontend",
+    "build": "npm run build --prefix controlog-frontend"
+  }
+}

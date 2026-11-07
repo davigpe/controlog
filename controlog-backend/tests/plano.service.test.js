@@ -110,6 +110,49 @@ describe('plano.service — otimizar', () => {
     });
   });
 
+  test('reotimizar nao mexe nos pedidos de grupos ja aprovados', async () => {
+    const prisma = buildPrismaMock();
+    // p3 e p4 (o grupo 1 da varredura) ja viraram Rota real: rotaId preenchido.
+    const comAprovados = () =>
+      pedidosEmCruz().map((pedido) =>
+        ['p3', 'p4'].includes(pedido.id)
+          ? { ...pedido, rotaId: 'rota1', rotaIndex: 1 }
+          : { ...pedido, rotaId: null }
+      );
+    prisma.plano.findUnique
+      .mockResolvedValueOnce({ id: 'plano1', pedidos: comAprovados() })
+      .mockResolvedValueOnce({ id: 'plano1', pedidos: comAprovados() });
+
+    const service = createPlanoService(prisma);
+    await service.otimizar('plano1', { tamanhoRota: 2 });
+
+    const chamadas = prisma._tx.pedido.updateMany.mock.calls.map(([args]) => args);
+    // Nenhum updateMany pode tocar em p3/p4, e o indice 1 segue reservado ao
+    // grupo aprovado: os grupos novos comecam no 2.
+    const tocados = chamadas.flatMap((c) => c.where.id.in);
+    expect(tocados).not.toContain('p3');
+    expect(tocados).not.toContain('p4');
+    expect(chamadas).toEqual([
+      { where: { id: { in: ['p5', 'p1'] } }, data: { rotaIndex: 2 } },
+      { where: { id: { in: ['p2'] } }, data: { rotaIndex: 3 } },
+    ]);
+  });
+
+  test('rejeita reotimizar quando todas as rotas do plano ja foram aprovadas', async () => {
+    const prisma = buildPrismaMock();
+    prisma.plano.findUnique.mockResolvedValue({
+      id: 'plano1',
+      pedidos: pedidosEmCruz().map((pedido) => ({ ...pedido, rotaId: 'rota1', rotaIndex: 1 })),
+    });
+
+    const service = createPlanoService(prisma);
+
+    await expect(service.otimizar('plano1', { tamanhoRota: 2 })).rejects.toBeInstanceOf(
+      ValidationError
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   test('rejeita otimizar um plano sem nenhum pedido', async () => {
     const prisma = buildPrismaMock();
     prisma.plano.findUnique.mockResolvedValue({ id: 'plano1', pedidos: [] });

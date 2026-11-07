@@ -39,6 +39,8 @@ const resposta: MinhasRotasResposta = {
           status: 'PENDENTE',
           dataPrevista: '2026-10-14T08:00:00.000Z',
           dataEfetiva: null,
+          motivoInsucesso: null,
+          observacao: null,
         },
         {
           id: 'e2',
@@ -47,6 +49,8 @@ const resposta: MinhasRotasResposta = {
           status: 'ENTREGUE',
           dataPrevista: '2026-10-14T08:00:00.000Z',
           dataEfetiva: '2026-10-14T10:30:00.000Z',
+          motivoInsucesso: null,
+          observacao: null,
         },
       ],
     },
@@ -150,5 +154,87 @@ describe('MinhasRotas', () => {
     renderWithProviders(<MinhasRotas />);
 
     expect(await screen.findByText(/2 entrega\(s\), 1 pendente\(s\)/)).toBeInTheDocument();
+  });
+  test('registrar insucesso envia motivo e observação e mostra o toast', async () => {
+    const user = userEvent.setup();
+    mockedApi.patch.mockResolvedValue({
+      data: { ...resposta.rotas[0].entregas[0], status: 'NAO_ENTREGUE' },
+    });
+    renderWithProviders(<MinhasRotas />);
+    await screen.findByText('RT-001');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar insucesso na entrega EN-001' })
+    );
+
+    await user.click(screen.getByRole('combobox', { name: /Motivo/i }));
+    await user.click(await screen.findByRole('option', { name: 'Cliente ausente' }));
+    await user.type(screen.getByLabelText(/Observação/i), 'Portaria fechada.');
+    await user.click(screen.getByRole('button', { name: 'Registrar insucesso' }));
+
+    await waitFor(() =>
+      expect(mockedApi.patch).toHaveBeenCalledWith('/minhas-rotas/entregas/e1/insucesso', {
+        motivo: 'CLIENTE_AUSENTE',
+        observacao: 'Portaria fechada.',
+      })
+    );
+    expect(await screen.findByText('Insucesso registrado na entrega EN-001.')).toBeInTheDocument();
+  });
+
+  test('"Outro" exige observação antes de deixar salvar', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<MinhasRotas />);
+    await screen.findByText('RT-001');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar insucesso na entrega EN-001' })
+    );
+    await user.click(screen.getByRole('combobox', { name: /Motivo/i }));
+    await user.click(await screen.findByRole('option', { name: 'Outro' }));
+
+    expect(screen.getByRole('button', { name: 'Registrar insucesso' })).toBeDisabled();
+    expect(mockedApi.patch).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText(/Observação/i), 'Rua interditada por obra.');
+    expect(screen.getByRole('button', { name: 'Registrar insucesso' })).toBeEnabled();
+  });
+
+  test('entrega já concluída não oferece o botão de insucesso', async () => {
+    renderWithProviders(<MinhasRotas />);
+    await screen.findByText('RT-001');
+
+    expect(
+      screen.queryByRole('button', { name: 'Registrar insucesso na entrega EN-002' })
+    ).not.toBeInTheDocument();
+  });
+
+  test('entrega não entregue mostra o motivo e ainda permite concluir', async () => {
+    const comInsucesso = {
+      ...resposta,
+      rotas: [
+        {
+          ...resposta.rotas[0],
+          entregas: [
+            {
+              ...resposta.rotas[0].entregas[0],
+              status: 'NAO_ENTREGUE',
+              dataEfetiva: '2026-10-27T14:00:00.000Z',
+              motivoInsucesso: 'CLIENTE_AUSENTE',
+              observacao: 'Portaria fechada.',
+            },
+          ],
+        },
+      ],
+    };
+    mockedApi.get.mockResolvedValue({ data: comInsucesso });
+    renderWithProviders(<MinhasRotas />);
+    await screen.findByText('RT-001');
+
+    expect(screen.getByText(/Cliente ausente — Portaria fechada\./)).toBeInTheDocument();
+    expect(screen.getByText(/Tentativa em/)).toBeInTheDocument();
+    // Segunda tentativa continua possível.
+    expect(
+      screen.getByRole('button', { name: 'Marcar entrega EN-001 como concluída' })
+    ).toBeInTheDocument();
   });
 });

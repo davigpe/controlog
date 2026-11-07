@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { EntregaDaRota, MinhasRotasResposta, StatusRota } from './types';
+import type { EntregaDaRota, MinhasRotasResposta, MotivoInsucesso, StatusRota } from './types';
 
 export function useMinhasRotas(status?: StatusRota) {
   return useQuery({
@@ -15,6 +15,21 @@ export function useConcluirEntrega() {
   return useMutation({
     mutationFn: async (entregaId: string) =>
       (await api.patch<EntregaDaRota>(`/minhas-rotas/entregas/${entregaId}/concluir`)).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['minhas-rotas'] }),
+  });
+}
+
+export interface InsucessoInput {
+  entregaId: string;
+  motivo: MotivoInsucesso;
+  observacao?: string;
+}
+
+export function useRegistrarInsucesso() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ entregaId, ...corpo }: InsucessoInput) =>
+      (await api.patch<EntregaDaRota>(`/minhas-rotas/entregas/${entregaId}/insucesso`, corpo)).data,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['minhas-rotas'] }),
   });
 }

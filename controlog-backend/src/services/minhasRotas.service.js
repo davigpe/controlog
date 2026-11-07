@@ -4,6 +4,21 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '.
 // com as próprias entregas. A única escrita que o motorista pode fazer é
 // concluir uma entrega sua — cadastro e atribuição seguem sendo de
 // gestor/operador.
+// Forma unica da entrega devolvida ao motorista, para concluir e registrar
+// insucesso responderem igual ao que a listagem ja entrega.
+function toEntregaResponse(entrega) {
+  return {
+    id: entrega.id,
+    codigo: entrega.codigo,
+    destino: entrega.destino,
+    status: entrega.status,
+    dataPrevista: entrega.dataPrevista,
+    dataEfetiva: entrega.dataEfetiva,
+    motivoInsucesso: entrega.motivoInsucesso ?? null,
+    observacao: entrega.observacao ?? null,
+  };
+}
+
 export function createMinhasRotasService(prisma) {
   async function motoristaDoUsuario(usuarioId) {
     const motorista = await prisma.motorista.findUnique({ where: { usuarioId } });
@@ -33,6 +48,8 @@ export function createMinhasRotasService(prisma) {
               status: true,
               dataPrevista: true,
               dataEfetiva: true,
+              motivoInsucesso: true,
+              observacao: true,
             },
           },
         },
@@ -86,14 +103,42 @@ export function createMinhasRotasService(prisma) {
         data: { status: 'ENTREGUE', dataEfetiva: new Date() },
       });
 
-      return {
-        id: atualizada.id,
-        codigo: atualizada.codigo,
-        destino: atualizada.destino,
-        status: atualizada.status,
-        dataPrevista: atualizada.dataPrevista,
-        dataEfetiva: atualizada.dataEfetiva,
-      };
+      return toEntregaResponse(atualizada);
+    },
+
+    // Registrar insucesso é o reverso de concluir: a tentativa foi feita e
+    // falhou. Fica NAO_ENTREGUE, e não CANCELADA — cancelada é o pedido que
+    // nunca saiu. O gestor é quem decide o destino depois (reatribuir,
+    // reagendar ou cancelar de fato), então aqui não há automação nenhuma.
+    async registrarInsucesso(usuarioId, entregaId, { motivo, observacao }) {
+      const motorista = await motoristaDoUsuario(usuarioId);
+
+      const entrega = await prisma.entrega.findUnique({ where: { id: entregaId } });
+      if (!entrega) throw new NotFoundError('Entrega não encontrada.');
+      if (entrega.motoristaId !== motorista.id) {
+        throw new ForbiddenError('Esta entrega não está atribuída a você.');
+      }
+      if (entrega.status === 'ENTREGUE') {
+        throw new ConflictError('Esta entrega já foi concluída.');
+      }
+      if (entrega.status === 'NAO_ENTREGUE') {
+        throw new ConflictError('Esta entrega já teve um insucesso registrado.');
+      }
+      if (entrega.status === 'CANCELADA') {
+        throw new ValidationError('Uma entrega cancelada não aceita registro de insucesso.');
+      }
+
+      const atualizada = await prisma.entrega.update({
+        where: { id: entregaId },
+        data: {
+          status: 'NAO_ENTREGUE',
+          motivoInsucesso: motivo,
+          observacao: observacao ?? null,
+          dataEfetiva: new Date(),
+        },
+      });
+
+      return toEntregaResponse(atualizada);
     },
   };
 }

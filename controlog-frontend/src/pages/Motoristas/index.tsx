@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Plus, Eye, Pencil, Trash2, Truck, CheckCircle, XCircle, KeyRound } from 'lucide-react'
+import { Search, Plus, Eye, Pencil, Trash2, Truck, CheckCircle, XCircle, KeyRound, FileUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -9,14 +9,16 @@ import {
   useCreateMotorista,
   useCriarAcessoMotorista,
   useDeleteMotorista,
+  useImportarMotoristas,
   useMotoristas,
   useUpdateMotorista,
 } from './api'
 import MotoristaFormModal from './MotoristaFormModal'
+import ImportarMotoristasModal from './ImportarMotoristasModal'
 import MotoristaAcessoModal from './MotoristaAcessoModal'
 import MotoristaDetalhes from './MotoristaDetalhes'
 import { statusExibicao } from './status'
-import type { AcessoMotoristaInput, Motorista, StatusMotorista } from './types'
+import type { AcessoMotoristaInput, Motorista, MotoristaInput, StatusMotorista } from './types'
 
 const statusOptions: StatusMotorista[] = ['ATIVO', 'INATIVO']
 
@@ -41,6 +43,7 @@ export default function Motoristas() {
   const [formAberto, setFormAberto]     = useState(false)
   const [excluindo, setExcluindo]       = useState<Motorista | null>(null)
   const [criandoAcesso, setCriandoAcesso] = useState<Motorista | null>(null)
+  const [importando, setImportando]     = useState(false)
 
   // Criar login dá acesso ao sistema a uma pessoa nova — o backend restringe ao
   // gestor, então a interface não oferece a ação a um operador.
@@ -56,6 +59,7 @@ export default function Motoristas() {
   const updateMutation = useUpdateMotorista()
   const deleteMutation = useDeleteMotorista()
   const acessoMutation = useCriarAcessoMotorista()
+  const importarMutation = useImportarMotoristas()
 
   // Contadores dos cards de resumo vêm de consultas próprias (só pagination.total,
   // pageSize: 1) em vez de contar sobre `motoristas`, porque esse array agora é só
@@ -105,6 +109,16 @@ export default function Motoristas() {
       .catch((error) => toast.error(getErrorMessage(error, 'Não foi possível criar o acesso.')))
   }
 
+  // Deixa o erro subir: o modal da importação é quem sabe traduzir o índice
+  // de cada linha recusada no número de linha da planilha do usuário.
+  async function handleImportar(motoristas: MotoristaInput[]) {
+    const { importados } = await importarMutation.mutateAsync(motoristas)
+    toast.success(
+      `${importados} ${importados === 1 ? 'motorista importado' : 'motoristas importados'}.`
+    )
+    setImportando(false)
+  }
+
   function handleExcluir() {
     if (!excluindo) return
     deleteMutation
@@ -128,13 +142,22 @@ export default function Motoristas() {
           <h1 className="text-xl font-bold text-gray-800">Motoristas</h1>
           <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} registros encontrados</p>
         </div>
-        <button
-          onClick={() => { setEditando(null); setFormAberto(true) }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
-        >
-          <Plus size={16} />
-          Novo Motorista
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportando(true)}
+            className="flex items-center gap-2 border border-gray-200 bg-white hover:border-blue-400 hover:text-blue-600 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+          >
+            <FileUp size={16} />
+            Importar planilha
+          </button>
+          <button
+            onClick={() => { setEditando(null); setFormAberto(true) }}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Novo Motorista
+          </button>
+        </div>
       </div>
 
       {/* ── Cards de resumo ── */}
@@ -255,6 +278,13 @@ export default function Motoristas() {
         onClose={() => { setFormAberto(false); setEditando(null) }}
         onSave={handleSave}
         saving={createMutation.isPending || updateMutation.isPending}
+      />
+
+      <ImportarMotoristasModal
+        open={importando}
+        onClose={() => setImportando(false)}
+        onImportar={handleImportar}
+        saving={importarMutation.isPending}
       />
 
       <MotoristaAcessoModal
