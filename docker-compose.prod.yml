@@ -74,7 +74,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-controlog}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env.production}
+      # Sem `:?` de propósito. O Compose interpola o arquivo inteiro ANTES de
+      # filtrar os profiles, então a forma obrigatória exigia a variável mesmo
+      # com o perfil db-local desligado — e quebrava o caminho recomendado,
+      # com RDS, que nem usa este serviço ("required variable
+      # POSTGRES_PASSWORD is missing a value" no build). Com o perfil ligado,
+      # quem cobra a senha é a própria imagem do Postgres, que recusa subir
+      # com uma mensagem clara.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: ${POSTGRES_DB:-controlog}
     # Sem ports: o banco fica só na rede interna, alcançável pela API e por
     # mais ninguém. Para inspecionar de fora, use um túnel SSH.
