@@ -1,0 +1,24 @@
+node_modules
+npm-debug.log*
+
+# Segredos nunca entram na imagem — as variáveis chegam por env_file/ambiente.
+.env
+.env.*
+!.env.example
+
+tests
+coverage
+jest.config.js
+
+# Artefatos da plataforma anterior, irrelevantes no contêiner.
+.vercel
+vercel.json
+api
+
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+.git
+.gitignore
+*.md

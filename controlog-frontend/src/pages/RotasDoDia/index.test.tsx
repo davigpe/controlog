@@ -127,7 +127,15 @@ describe('Rotas do Dia', () => {
     mockedApi.get.mockResolvedValue({
       data: relatorio({ totalRotas: 0, totalEntregas: 0, entregasConcluidas: 0, rotas: [] }),
     });
+    const user = userEvent.setup();
     renderWithProviders(<RotasDoDia />);
+
+    // A tela mostra o dia selecionado, que começa em hoje. Escolher uma data
+    // fixa antes de conferir a mensagem é o que mantém este teste
+    // determinístico — comparar com 07/11 direto o faria falhar no dia
+    // seguinte, que foi exatamente o que aconteceu.
+    await user.clear(await screen.findByLabelText('Dia'));
+    await user.type(screen.getByLabelText('Dia'), '2026-11-07');
 
     expect(await screen.findByText(/Nenhuma rota em 07\/11\/2026/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Exportar Excel/i })).toBeDisabled();
