@@ -3,6 +3,11 @@
 Este documento registra a arquitetura de deploy, as URLs, e como reproduzir/atualizar
 o ambiente de produção na Vercel + Neon.
 
+> **Este é o deploy atual, em migração.** A mudança para infraestrutura própria na AWS
+> (EC2 + RDS) está preparada em [`DEPLOY_AWS.md`](DEPLOY_AWS.md) — imagens Docker,
+> nginx e Compose já versionados. A Vercel segue no ar até a AWS estar funcionando;
+> nada aqui foi desligado.
+
 ## URLs de produção
 
 | Serviço | URL |

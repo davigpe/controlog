@@ -1,0 +1,21 @@
+node_modules
+npm-debug.log*
+dist
+
+# Segredos e configuração local nunca entram na imagem.
+.env
+.env.*
+!.env.example
+
+coverage
+
+# Artefatos da plataforma anterior, irrelevantes no contêiner.
+.vercel
+vercel.json
+
+Dockerfile
+.dockerignore
+
+.git
+.gitignore
+*.md

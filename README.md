@@ -58,9 +58,12 @@ controlog/
 ├── docs/
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
 │   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
-│   └── DEPLOY.md                   # arquitetura de deploy, URLs e como reproduzir
+│   ├── DEPLOY.md                   # arquitetura de deploy atual (Vercel + Neon)
+│   └── DEPLOY_AWS.md               # migração para AWS: EC2 + RDS, passo a passo
 ├── scripts/
 │   └── dev.mjs            # sobe banco, API e interface com um comando só
+├── docker-compose.prod.yml  # pilha de produção: nginx + API (+ Postgres opcional)
+├── .env.production.example  # modelo das variáveis de produção
 ├── package.json           # scripts da raiz (sem dependências próprias)
 └── README.md
 ```
@@ -189,6 +192,23 @@ Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); os dois projet
 Vercel estão conectados ao repositório e fazem deploy automático quando sua respectiva
 pasta muda em `main`. Detalhes completos, variáveis de ambiente e passo a passo para
 reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+### Migração para a AWS (preparada, ainda não provisionada)
+
+O repositório já traz o necessário para rodar em infraestrutura própria: imagens
+Docker do backend e do frontend, um nginx que serve o site e encaminha `/api` para a
+API, e o `docker-compose.prod.yml` que amarra os dois. Nessa arquitetura o site e a
+API têm a mesma origem, o que elimina o CORS e a URL de API embutida no build — as
+duas limitações registradas no deploy atual.
+
+```bash
+cp .env.production.example .env.production   # preencher
+npm run prod:up                              # constrói e sobe a pilha
+```
+
+Passo a passo de EC2 + RDS, custos e alternativas avaliadas em
+[`docs/DEPLOY_AWS.md`](docs/DEPLOY_AWS.md). A Vercel continua no ar até a AWS estar
+funcionando.
 
 ---
 

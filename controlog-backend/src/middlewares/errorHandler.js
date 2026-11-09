@@ -15,6 +15,18 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
+  // O body-parser recusa corpo acima do limite com type 'entity.too.large' e
+  // status 413, mas é um Error comum, não um AppError — sem este caso ele
+  // caía no 500 genérico e a pessoa importando uma planilha grande recebia
+  // "Erro interno no servidor", sem pista do que fazer.
+  if (err?.type === 'entity.too.large') {
+    return sendError(res, req, 413, {
+      error: 'PayloadTooLargeError',
+      message:
+        'O conteúdo enviado é grande demais. Divida a planilha em lotes menores e tente de novo.',
+    });
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
       return sendError(res, req, 409, {

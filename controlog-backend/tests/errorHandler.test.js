@@ -73,6 +73,31 @@ describe('errorHandler', () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 
+  // Importação de motoristas por planilha: corpo acima do limite do
+  // express.json. Sem este caso, virava "Erro interno no servidor" e quem
+  // estava importando não tinha como saber o que fazer.
+  test('traduz corpo grande demais (entity.too.large) em 413', () => {
+    const res = buildRes();
+    const req = { method: 'POST', originalUrl: '/api/motoristas/importar' };
+    const erro = Object.assign(new Error('request entity too large'), {
+      type: 'entity.too.large',
+      status: 413,
+    });
+
+    errorHandler(erro, req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'PayloadTooLargeError',
+        message: expect.stringContaining('lotes menores'),
+        path: '/api/motoristas/importar',
+      })
+    );
+    // Não é falha do servidor: não deve poluir o log de erros.
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
   test('responde 500 para erros não mapeados', () => {
     const res = buildRes();
     errorHandler(new Error('boom'), {}, res, jest.fn());

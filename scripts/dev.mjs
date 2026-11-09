@@ -204,10 +204,60 @@ function prepararPrisma() {
   rodar('npx prisma generate', BACKEND, { silencioso: true })
 }
 
-// ─── 4. Os dois servidores ────────────────────────────────────────────────
+// ─── 4. Portas livres ─────────────────────────────────────────────────────
+
+/** Porta da API, conforme o .env do backend. */
+function portaDaApi() {
+  const conteudo = readFileSync(join(BACKEND, '.env'), 'utf8')
+  const linha = conteudo.match(/^\s*PORT\s*=\s*["']?(\d+)/m)
+  return linha ? Number(linha[1]) : 3333
+}
+
+/** Porta padrão do Vite; se estiver ocupada ele escolhe outra em silêncio. */
+const PORTA_WEB = 5173
+
+/*
+ * Sem esta checagem, um `npm run dev` já aberto em outro terminal leva a dois
+ * sintomas difíceis de ligar à causa: a API entra num laço de EADDRINUSE sob
+ * o node --watch, e o Vite sobe numa porta diferente sem avisar — o navegador
+ * então fala com a instância antiga.
+ */
+async function garantirPortasLivres() {
+  const ocupadas = []
+  for (const [porta, quem] of [
+    [portaDaApi(), 'a API'],
+    [PORTA_WEB, 'a interface'],
+  ]) {
+    if (await portaAberta({ host: '127.0.0.1', porta }, 400)) ocupadas.push(`${porta} (${quem})`)
+  }
+
+  if (ocupadas.length > 0) {
+    abortar(
+      `Porta já em uso: ${ocupadas.join(', ')}.`,
+      'Provavelmente há outro `npm run dev` aberto — feche-o com Ctrl+C e rode de novo.'
+    )
+  }
+}
+
+// ─── 5. Os dois servidores ────────────────────────────────────────────────
 
 const filhos = []
 let encerrando = false
+
+/*
+ * Códigos de saída que significam "pararam porque mandei parar".
+ *
+ * Com shell: true quem sai é o shell, com 128+sinal, e não o processo
+ * sinalizado — daí 130 (SIGINT) e 143 (SIGTERM). No Windows o Ctrl+C não vira
+ * sinal: o processo termina com um status NTSTATUS, e sem reconhecê-los o
+ * script anunciava "backend encerrou (código 1073807364)" a cada parada.
+ */
+const SAIDAS_DE_PARADA = new Set([
+  130, // 128 + SIGINT
+  143, // 128 + SIGTERM
+  0xc000013a, // STATUS_CONTROL_C_EXIT
+  0x40010004, // DBG_CONTROL_C
+])
 
 /** Mata o processo e seus descendentes — no Windows, npm.cmd gera uma árvore. */
 function matarArvore(filho) {
@@ -223,7 +273,9 @@ function encerrarTudo(codigo) {
   if (encerrando) return
   encerrando = true
   for (const { processo } of filhos) matarArvore(processo)
-  process.exit(codigo)
+  // process.exit só leva o byte baixo do número: um status do Windows como
+  // 1073807364 viraria 4, anunciando um erro que nunca houve.
+  process.exit(Number.isInteger(codigo) && codigo >= 0 && codigo <= 255 ? codigo : 1)
 }
 
 /** Repassa a saída linha a linha, com o prefixo de quem falou. */
@@ -249,10 +301,8 @@ function iniciar(nome, prefixo, cwd) {
     if (encerrando) return
 
     // Ctrl+C chega aos filhos junto com o pai, então a saída deles é
-    // consequência do pedido de parada, não uma queda a anunciar. Com
-    // shell: true quem sai é o shell, com 128+sinal, e não o processo
-    // sinalizado — daí os códigos 130 (SIGINT) e 143 (SIGTERM) aqui.
-    if (sinal !== null || codigo === 130 || codigo === 143) {
+    // consequência do pedido de parada, não uma queda a anunciar.
+    if (sinal !== null || SAIDAS_DE_PARADA.has(codigo)) {
       encerrarTudo(0)
       return
     }
@@ -272,6 +322,8 @@ async function main() {
   garantirDependencias(BACKEND, 'backend')
   garantirDependencias(FRONTEND, 'frontend')
 
+  await garantirPortasLivres()
+
   if (semBanco) {
     aviso('--sem-banco: pulando Docker e migrations.')
   } else {
@@ -280,8 +332,8 @@ async function main() {
   }
 
   console.log('')
-  console.log(`  ${verde('API')}       http://localhost:3333`)
-  console.log(`  ${verde('Interface')} http://localhost:5173`)
+  console.log(`  ${verde('API')}       http://localhost:${portaDaApi()}`)
+  console.log(`  ${verde('Interface')} http://localhost:${PORTA_WEB}`)
   console.log(`  ${fraco('Logins do seed: gestor@controlog.com / motorista@controlog.com (senha controlog123)')}`)
   console.log(`  ${fraco('Ctrl+C derruba os dois.')}`)
   console.log('')
