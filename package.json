@@ -1,6 +1,6 @@
 {
   "name": "controlog",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "description": "Controlog — scripts de conveniência da raiz do monorepo (API + interface web)",
   "type": "module",
