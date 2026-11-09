@@ -284,6 +284,29 @@ ssh -i sua-chave.pem -L 5432:SEU-ENDPOINT.rds.amazonaws.com:5432 ec2-user@SEU-IP
 # e conecte o cliente em localhost:5432
 ```
 
+## Como conferir que subiu certo
+
+Depois do `up -d`, rodando na instância:
+
+```bash
+# Os três (ou dois, com RDS) devem estar healthy, sem reinícios
+docker compose -f docker-compose.prod.yml ps
+docker inspect controlog-api-1 --format '{{.RestartCount}}'   # tem de ser 0
+
+curl -s http://localhost/health                   # {"status":"ok",...}
+curl -s -o /dev/null -w '%{http_code}
+' http://localhost/              # 200
+curl -s -o /dev/null -w '%{http_code}
+' http://localhost/rotas-do-dia  # 200, não 404
+```
+
+O último é o que pega erro de SPA fallback: se vier 404, o `try_files` do
+nginx não está valendo e só a página inicial funcionaria.
+
+Reinício maior que zero quase sempre quer dizer que a API não alcançou o
+banco na primeira tentativa — confira `DATABASE_URL` e o security group do
+RDS com `docker compose logs api`.
+
 ## Alternativas consideradas
 
 | Opção | Por que não |
@@ -311,9 +334,13 @@ Honestidade sobre os limites desta preparação:
 
 - **Nada foi provisionado na AWS.** Este guia e os arquivos de contêiner são
   a preparação; criar a conta, a instância e o banco é um passo manual.
-- **As imagens não foram construídas nem executadas** — o Docker estava
-  indisponível na máquina de desenvolvimento quando isto foi escrito. O
-  primeiro `up -d --build` na instância é também o primeiro teste real.
+- **A pilha foi construída e executada**, mas em Docker local, com o perfil
+  `db-local` — não contra RDS. Funcionou de ponta a ponta pelo nginx: as sete
+  migrations aplicadas, login, as telas e endpoints novos, fallback de rota
+  do React Router, e a importação de motoristas gravando e recusando lote
+  conforme o esperado. O que **não** foi exercitado é o específico da AWS:
+  conexão com RDS por TLS (`sslmode=require`), regras de security group e o
+  comportamento da instância sob o limite de memória de uma `t3.micro`.
 - **HTTPS está descrito, não montado** (ver passo 6).
 - **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
   Um workflow do GitHub Actions que faça isso sozinho é um passo natural
