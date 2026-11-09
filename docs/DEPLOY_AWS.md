@@ -44,6 +44,27 @@ resolve de uma vez as duas limitações registradas no deploy anterior:
 A API não publica porta no host: só o nginx fica exposto. Não há como
 alcançá-la por fora pulando o proxy.
 
+## Estado atual
+
+No ar desde **09/11/2026** em **http://52.71.237.16**, na versão `1.6.0`.
+
+| Recurso | Valor |
+|---|---|
+| EC2 | `t3.micro`, Amazon Linux 2023, 2 vCPU, 913 MiB + 2 GiB de swap |
+| RDS | `controlog-db`, PostgreSQL, sem acesso público (IP privado na VPC) |
+| Região | `us-east-1` |
+
+Conferido na subida: as sete migrations aplicadas no RDS por TLS
+(`sslmode=require`), seed executado, login pelo proxy, categorias de veículo
+e o filtro por categoria, o relatório de rotas do dia, fallback de rota
+profunda do React Router, `Cache-Control` único nos assets, e os dois limites
+de corpo respondendo 413 — o do nginx (2 MB) e o da aplicação (1 MB, com a
+mensagem que orienta a dividir a planilha). Zero reinícios nos dois
+contêineres.
+
+O que ainda não foi exercitado em produção: carga real, falha do RDS e
+restauração de snapshot.
+
 ## Custo — leia antes de criar a conta
 
 O nível gratuito da AWS mudou. Contas criadas **a partir de 15/07/2025** não
@@ -368,17 +389,11 @@ versionados neste repositório.
 
 ## O que ainda não está pronto
 
-Honestidade sobre os limites desta preparação:
+Honestidade sobre os limites deste deploy:
 
-- **Nada foi provisionado na AWS.** Este guia e os arquivos de contêiner são
-  a preparação; criar a conta, a instância e o banco é um passo manual.
-- **A pilha foi construída e executada**, mas em Docker local, com o perfil
-  `db-local` — não contra RDS. Funcionou de ponta a ponta pelo nginx: as sete
-  migrations aplicadas, login, as telas e endpoints novos, fallback de rota
-  do React Router, e a importação de motoristas gravando e recusando lote
-  conforme o esperado. O que **não** foi exercitado é o específico da AWS:
-  conexão com RDS por TLS (`sslmode=require`), regras de security group e o
-  comportamento da instância sob o limite de memória de uma `t3.micro`.
+- **Sem automação de provisionamento.** A infraestrutura foi
+  criada à mão pelo console; não há Terraform nem CloudFormation que a
+  reproduza. Recriar do zero é repetir os passos 1 e 2 deste guia.
 - **HTTPS está descrito, não montado** (ver passo 6).
 - **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
   Um workflow do GitHub Actions que faça isso sozinho é um passo natural
