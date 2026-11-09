@@ -293,12 +293,12 @@ Depois do `up -d`, rodando na instância:
 docker compose -f docker-compose.prod.yml ps
 docker inspect controlog-api-1 --format '{{.RestartCount}}'   # tem de ser 0
 
-curl -s http://localhost/health                   # {"status":"ok",...}
-curl -s -o /dev/null -w '%{http_code}
-' http://localhost/              # 200
-curl -s -o /dev/null -w '%{http_code}
-' http://localhost/rotas-do-dia  # 200, não 404
+curl -s http://localhost/health                        # {"status":"ok",...}
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost/
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost/rotas-do-dia
 ```
+
+As duas últimas devem responder `200`.
 
 O último é o que pega erro de SPA fallback: se vier 404, o `try_files` do
 nginx não está valendo e só a página inicial funcionaria.
