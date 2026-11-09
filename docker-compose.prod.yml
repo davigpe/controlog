@@ -21,6 +21,16 @@ services:
       PORT: "3333"
     expose:
       - "3333"
+    depends_on:
+      db:
+        condition: service_healthy
+        # required: false porque no caminho recomendado o banco é o RDS e o
+        # serviço `db` nem chega a existir (perfil db-local desligado) — sem
+        # isto o Compose recusaria subir a API. Com o perfil ligado, segura a
+        # API até o Postgres aceitar conexão: sem essa espera ela tenta migrar
+        # contra um banco que ainda está iniciando, morre, e o `web` fica para
+        # trás mesmo depois de a API se recuperar sozinha.
+        required: false
     healthcheck:
       test:
         - CMD
