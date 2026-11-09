@@ -1,0 +1,55 @@
+# Sobreposição de HTTPS: põe o Caddy na frente do nginx para terminar o TLS.
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+#     --env-file .env.production up -d
+#
+# O --env-file é obrigatório aqui (e não era no deploy em HTTP): CONTROLOG_DOMAIN
+# é lido na interpolação do próprio arquivo, e a interpolação não enxerga o
+# env_file dos serviços — aquele só alimenta o ambiente dos contêineres.
+#
+# Antes de subir:
+#   1. CONTROLOG_DOMAIN e TRUST_PROXY=2 no .env.production.
+#   2. CORS_ORIGIN apontando para https://<domínio>.
+#   3. Registro A do domínio (e de www, se mantiver o redirecionamento do
+#      Caddyfile) apontando para o IP desta instância. O Let's Encrypt
+#      resolve o nome e chama de volta na porta 80 para provar que o domínio
+#      é seu, então o DNS tem que estar propagado ANTES do primeiro up.
+#   4. Portas 80 e 443 abertas no security group. A 80 continua necessária
+#      depois da emissão: é por ela que o Caddy redireciona http → https e
+#      que as renovações são validadas.
+
+services:
+  web:
+    # !override porque o Compose concatena as listas de `ports` entre
+    # arquivos: sem isto o 80:80 do arquivo base continuaria valendo e
+    # brigaria com o Caddy pela mesma porta do host. O nginx passa a existir
+    # só na rede interna, alcançável pelo Caddy e por mais ninguém.
+    ports: !override []
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CONTROLOG_DOMAIN: ${CONTROLOG_DOMAIN:?defina CONTROLOG_DOMAIN no .env.production e passe --env-file .env.production}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # caddy-data guarda os certificados emitidos e a chave da conta ACME.
+      # Sem este volume, cada recriação do contêiner pediria um certificado
+      # novo, e a cota de 5 por domínio por semana da Let's Encrypt estouraria
+      # num único dia de ajustes.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        # Espera o nginx responder antes de abrir a porta 443: subir junto
+        # devolveria 502 nos primeiros segundos de cada deploy.
+        condition: service_healthy
+
+volumes:
+  caddy-data:
+  caddy-config:

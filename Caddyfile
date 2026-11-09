@@ -1,0 +1,46 @@
+# Caddy na frente do nginx: termina o TLS e encaminha o resto.
+#
+# Por que um segundo proxy em vez de pôr o certificado no nginx: o Caddy pede
+# e renova o certificado do Let's Encrypt sozinho, sem certbot e sem cron. O
+# nginx continua fazendo o que já fazia (servir o SPA e encaminhar /api para
+# a API), só que agora apenas na rede interna do Compose.
+#
+# O domínio vem de CONTROLOG_DOMAIN para este arquivo não ficar preso a um
+# nome — ver docker-compose.https.yml.
+
+# Opções globais (descomente o bloco inteiro se for usar alguma):
+# {
+# 	# Avisos de expiração por e-mail. O Caddy renova sozinho, então isto é
+# 	# só uma rede de segurança para quando a renovação falhar.
+# 	email voce@exemplo.com
+#
+# 	# Ao testar a configuração, aponte para o ambiente de homologação: a
+# 	# cota de produção da Let's Encrypt é de 5 certificados por domínio por
+# 	# semana, e um punhado de tentativas erradas queima o domínio até a
+# 	# semana seguinte. O certificado de homologação não é aceito pelos
+# 	# navegadores — é só para confirmar que a emissão chega ao fim.
+# 	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+# }
+
+# Quem digitar www vai para o domínio sem www, para o site ter um endereço
+# canônico só. O Caddy pede certificado para este nome também, então o
+# registro A de www precisa existir no DNS — se não existir, remova este
+# bloco, ou a emissão falha e o Caddy fica tentando.
+www.{$CONTROLOG_DOMAIN} {
+	redir https://{$CONTROLOG_DOMAIN}{uri} permanent
+}
+
+{$CONTROLOG_DOMAIN} {
+	# O navegador passa a exigir HTTPS neste domínio pelo próximo ano, o que
+	# fecha a janela do primeiro acesso em http. Em .app isto é reforço: o
+	# TLD inteiro já vem com HSTS pré-carregado nos navegadores.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Sem `encode` de propósito: o nginx atrás já comprime (gzip on), e
+	# comprimir de novo só gastaria a CPU da t3.micro.
+	#
+	# O reverse_proxy do Caddy já manda X-Forwarded-For, X-Forwarded-Proto e
+	# X-Forwarded-Host — é por isso que a API precisa de TRUST_PROXY=2 neste
+	# arranjo, com dois proxies na cadeia em vez de um.
+	reverse_proxy web:80
+}
