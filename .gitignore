@@ -10,3 +10,9 @@ node_modules/
 
 # Artefatos locais de build/execução dos contêineres.
 *.log
+
+# Chaves SSH (o par de chaves da EC2 fica na raiz durante o deploy). Um
+# `git add -A` distraido publicaria a chave privada no GitHub, e a partir
+# dai a unica correcao seria trocar o key pair na AWS.
+*.pem
+*.ppk

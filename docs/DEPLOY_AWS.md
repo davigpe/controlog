@@ -133,6 +133,24 @@ Associe um **Elastic IP** à instância. Sem ele, o IP público muda a cada
 parada/início — e o endereço que você entregou para avaliação deixa de
 funcionar.
 
+### Permissão da chave
+
+O OpenSSH recusa a chave se ela estiver legível por outras contas.
+
+**Linux/macOS:**
+
+```bash
+chmod 400 controlog-key.pem
+```
+
+**Windows** (`chmod` não tem efeito aqui: o ssh.exe olha as ACLs do NTFS,
+não o bit de permissão do POSIX, e segue reclamando de "permissions are too
+open" mesmo depois do chmod). No PowerShell, na pasta da chave:
+
+```powershell
+icacls controlog-key.pem /inheritance:r /grant:r "$($env:USERNAME):(R)"
+```
+
 ## 3. Docker na instância
 
 ```bash
@@ -157,6 +175,26 @@ Confira depois de reconectar:
 ```bash
 docker compose version
 ```
+
+### Swap (faça antes do primeiro build)
+
+A `t3.micro` tem 1 GiB de RAM e nenhuma swap. O build do frontend roda o
+Vite/Rollup dentro do contêiner e é o passo mais pesado de tudo: sem swap ele
+pode ser morto pelo OOM killer no meio, e o sintoma é confuso — o build
+termina com `exit code 137` ou simplesmente "killed", sem erro de
+compilação nenhum.
+
+```bash
+sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # sobrevive ao reboot
+
+free -h   # deve mostrar 2.0Gi em Swap
+```
+
+Os 2 GiB saem do disco de 8 GB da instância, que sobra depois das imagens.
 
 ## 4. Subir a aplicação
 
