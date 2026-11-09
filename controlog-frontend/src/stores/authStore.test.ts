@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import axios from 'axios';
 import { useAuthStore } from './authStore';
+// ?raw do Vite: lê o fonte como texto sem precisar dos tipos do Node, que o
+// tsconfig.app não inclui (types: vite/client).
+import fonteDoAuthStore from './authStore?raw';
 
 vi.mock('axios', async (importOriginal) => {
   const actual = await importOriginal<typeof import('axios')>();
@@ -116,5 +119,50 @@ describe('authStore', () => {
     });
 
     await expect(useAuthStore.getState().resetPassword('invalido', 'novaSenhaSegura123')).rejects.toBeDefined();
+  });
+});
+
+// Regressão. O authStore chama axios cru, montando a base à mão, enquanto o
+// resto do app usa o cliente de lib/api.ts — e tem de ser assim, porque
+// lib/api.ts importa este store para ler o token no interceptor, e importá-lo
+// de volta criaria um ciclo. O preço disso foi uma segunda cópia da expressão
+// da base, que ficou para trás sem o fallback `|| '/api'` quando lib/api.ts
+// ganhou o dele. No build de produção, com VITE_API_URL vazia, as cinco rotas
+// de autenticação saíam para /auth/... em vez de /api/auth/... e o nginx
+// respondia 405: login, cadastro e recuperação de senha inacessíveis pelo
+// site, com todos os testes passando, porque todos mockam a rede.
+//
+// Comparar as duas bases como elas estão não pegaria nada: em teste a
+// VITE_API_URL vem preenchida do .env, e as duas cópias dariam o mesmo valor.
+// O que impede a divergência é proibir a segunda cópia de existir. A regra do
+// fallback em si está coberta em lib/apiBaseUrl.test.ts.
+describe('base da API', () => {
+  test('o authStore não resolve a própria base a partir de import.meta.env', () => {
+    expect(fonteDoAuthStore).not.toMatch(/import\.meta\.env/);
+    expect(fonteDoAuthStore).toMatch(/API_BASE_URL/);
+  });
+
+  test('o cliente de lib/api.ts usa a mesma base compartilhada', async () => {
+    const [{ api }, { API_BASE_URL }] = await Promise.all([
+      import('@/lib/api'),
+      import('@/lib/apiBaseUrl'),
+    ]);
+
+    expect(api.defaults.baseURL).toBe(API_BASE_URL);
+  });
+
+  test.each([
+    ['login', () => useAuthStore.getState().login('a@b.com', 'controlog123')],
+    ['register', () => useAuthStore.getState().register('A', 'a@b.com', 'controlog123')],
+    ['forgotPassword', () => useAuthStore.getState().forgotPassword('a@b.com')],
+    ['resetPassword', () => useAuthStore.getState().resetPassword('tok', 'controlog123')],
+  ])('%s chama uma URL sob a base compartilhada', async (_nome, acao) => {
+    const { API_BASE_URL } = await import('@/lib/apiBaseUrl');
+    mockedAxios.post.mockResolvedValue({ data: {} });
+
+    await acao();
+
+    const [url] = mockedAxios.post.mock.calls.at(-1)!;
+    expect(String(url).startsWith(`${API_BASE_URL}/auth/`)).toBe(true);
   });
 });

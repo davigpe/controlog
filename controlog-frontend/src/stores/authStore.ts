@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL } from '@/lib/apiBaseUrl';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -21,7 +22,10 @@ interface AuthState {
   resetPassword: (token: string, novaSenha: string) => Promise<void>;
 }
 
-const baseURL = import.meta.env.VITE_API_URL;
+// Mesma base usada pelo cliente de lib/api.ts. Aqui as chamadas usam axios
+// cru de propósito: lib/api.ts importa este store para ler o token no
+// interceptor, e importá-lo de volta criaria um ciclo.
+const baseURL = API_BASE_URL;
 
 export const useAuthStore = create<AuthState>()(
   persist(
