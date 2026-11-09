@@ -1,0 +1,12 @@
+# Segredos de produção: o .env.production fica só no servidor. Apenas o
+# modelo (.env.production.example) é versionado.
+.env
+.env.*
+!.env.*.example
+
+# A raiz não tem dependências próprias (os scripts são Node puro), mas um
+# `npm install` acidental aqui não deve sujar o repositório.
+node_modules/
+
+# Artefatos locais de build/execução dos contêineres.
+*.log

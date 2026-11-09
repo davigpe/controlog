@@ -1,8 +1,19 @@
 import axios, { type AxiosError } from 'axios';
 import { useAuthStore } from '@/stores/authStore';
 
+/*
+ * Sem VITE_API_URL, a API é procurada em /api no mesmo host que serviu a
+ * página. É assim que o deploy em contêiner funciona: o nginx da frente
+ * entrega o site e encaminha /api para o backend, então não há origem
+ * cruzada e o bundle não fica preso a um domínio escolhido no build — que
+ * era a maior amarra do deploy anterior, onde trocar a URL da API exigia
+ * reconstruir o frontend inteiro.
+ *
+ * Em desenvolvimento a variável está no .env e aponta para localhost:3333,
+ * onde a API roda em outra porta.
+ */
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 api.interceptors.request.use((config) => {

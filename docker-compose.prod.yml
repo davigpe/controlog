@@ -1,0 +1,80 @@
+# Pilha de produção do Controlog: um nginx na frente servindo o site e
+# encaminhando /api para a API, mais o banco quando ele não for gerenciado.
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# A API não publica porta no host de propósito: só o nginx fica exposto, e é
+# ele quem fala com ela pela rede interna do Compose. Assim não há como
+# alcançar a API por fora pulando o proxy.
+name: controlog
+
+services:
+  api:
+    build:
+      context: ./controlog-backend
+    image: controlog-api:${TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3333"
+    expose:
+      - "3333"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3333/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Generoso porque o contêiner aplica as migrations antes de escutar a
+      # porta; num banco novo isso leva alguns segundos.
+      start_period: 90s
+
+  web:
+    build:
+      context: ./controlog-frontend
+      args:
+        # Vazio: o cliente usa /api relativo e este mesmo nginx encaminha.
+        VITE_API_URL: ""
+    image: controlog-web:${TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        # Espera a API ficar saudável: o nginx resolve o nome "api" na
+        # primeira requisição, e subir junto só geraria 502 por alguns
+        # segundos a cada deploy.
+        condition: service_healthy
+
+  # Banco no próprio host, para quem não for usar o RDS.
+  #
+  #   docker compose -f docker-compose.prod.yml --profile db-local up -d
+  #
+  # Sai mais barato (não gasta a cota de RDS do nível gratuito), mas backup,
+  # atualização e ponto único de falha passam a ser problema seu. Para o TCC
+  # o RDS é a escolha recomendada — ver docs/DEPLOY_AWS.md.
+  db:
+    image: postgres:16-alpine
+    profiles: ["db-local"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-controlog}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-controlog}
+    # Sem ports: o banco fica só na rede interna, alcançável pela API e por
+    # mais ninguém. Para inspecionar de fora, use um túnel SSH.
+    volumes:
+      - controlog-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-controlog} -d ${POSTGRES_DB:-controlog}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  controlog-db:
