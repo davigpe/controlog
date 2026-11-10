@@ -381,11 +381,29 @@ curl -s https://seu-dominio.app/health
 
 ## 7. Atualizar o deploy
 
+**O caminho normal é não fazer nada disto:** um push na `main` publica sozinho
+(passo 9). Esta seção é o modo manual, para quando o workflow estiver fora do
+ar ou você precisar intervir na instância.
+
 ```bash
 cd controlog
-git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+git pull --ff-only origin main
+bash scripts/deploy-instancia.sh
 ```
+
+O script é o mesmo que o deploy automático executa: constrói, espera os
+contêineres ficarem saudáveis, confere a aplicação pela porta pública e limpa
+imagens órfãs.
+
+Se precisar chamar o Compose direto, **inclua a sobreposição de HTTPS**:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production up -d --build
+```
+
+Esquecer o segundo `-f` sobe a pilha sem o Caddy, e o site volta para HTTP com
+a porta 443 sem ninguém escutando.
 
 O Compose recria só o que mudou. As migrations novas são aplicadas pela API
 ao subir.
@@ -435,6 +453,96 @@ ssh -i sua-chave.pem -L 5432:SEU-ENDPOINT.rds.amazonaws.com:5432 ec2-user@SEU-IP
 # e conecte o cliente em localhost:5432
 ```
 
+## 9. Deploy automático (GitHub Actions)
+
+Um push na `main` publica sozinho, desde que os testes passem. O workflow é o
+[.github/workflows/ci.yml](../.github/workflows/ci.yml): os jobs `backend` e
+`frontend` rodam sempre, e o `deploy` depende dos dois (`needs`) e só roda em
+push na `main`.
+
+### Por que SSM e não SSH
+
+O security group libera a porta 22 só para um IP fixo, e os runners do GitHub
+têm IP dinâmico. As saídas por SSH seriam abrir a 22 para o mundo ou guardar a
+chave privada da instância como segredo do repositório — nenhuma das duas é
+aceitável.
+
+Com o **Systems Manager** não há porta de entrada nova: a instância abre a
+conexão para fora, e o GitHub manda o comando pela API da AWS. A chave `.pem`
+não sai da sua máquina, e cada execução fica no CloudTrail com o nome de quem
+a disparou.
+
+A autenticação é por **OIDC**: o Actions prova quem é com um token de curta
+duração, trocado por credencial temporária. Não há chave de acesso guardada no
+GitHub. A confiança é amarrada em `repo:<dono>/<repo>:ref:refs/heads/main`, com
+`StringEquals` e sem curinga — outro repositório, ou outro branch, não assume
+a role.
+
+### Criar as identidades
+
+Uma vez só, com o perfil administrativo:
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/cicd.yml \
+  --stack-name controlog-cicd \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides InstanceId=i-0312046515c971063 \
+  --region us-east-1 --profile controlog
+```
+
+O template ([infra/cicd.yml](../infra/cicd.yml)) cria o provider OIDC do
+GitHub, a role que o workflow assume e a role mais o instance profile que
+tornam a instância gerenciável pelo SSM.
+
+### Associar o instance profile
+
+A instância já existia quando o template foi escrito, então o CloudFormation
+não a anexa sozinho:
+
+```bash
+aws ec2 associate-iam-instance-profile \
+  --instance-id i-0312046515c971063 \
+  --iam-instance-profile Name=controlog-ec2-ssm \
+  --region us-east-1 --profile controlog
+```
+
+Não reinicia nada. Em poucos minutos a instância aparece em Systems Manager →
+*Fleet Manager* como nó gerenciado. Para conferir:
+
+```bash
+aws ssm describe-instance-information \
+  --filters Key=InstanceIds,Values=i-0312046515c971063 \
+  --region us-east-1 --profile controlog
+```
+
+### Variáveis no repositório
+
+Em *Settings → Secrets and variables → Actions → **Variables***, não em
+*Secrets*: nenhum dos dois valores é sigiloso, e deixá-los visíveis facilita
+depurar um workflow.
+
+| Nome | Valor |
+|---|---|
+| `AWS_DEPLOY_ROLE_ARN` | a saída `ArnDaRoleDeDeploy` da stack |
+| `AWS_INSTANCE_ID` | `i-0312046515c971063` |
+
+### O que roda na instância
+
+O SSM dá `git pull` na `main` e chama
+[scripts/deploy-instancia.sh](../scripts/deploy-instancia.sh), que constrói,
+espera `api` e `web` ficarem saudáveis, confere `https://<domínio>/health`
+pela porta pública e limpa imagens órfãs.
+
+A verificação é pela porta pública de propósito: um contêiner saudável atrás
+de um proxy quebrado passaria despercebido numa checagem por `localhost`.
+
+Se qualquer etapa falhar, o script sai com erro, o SSM reporta `Failed` e o
+job fica vermelho com as últimas 40 linhas do log do build.
+
+> O `.env.production` continua só na instância. O workflow nunca o toca, e
+> nenhum segredo de produção passa pelo GitHub.
+
 ## Como conferir que subiu certo
 
 Depois do `up -d`, rodando na instância:
@@ -483,14 +591,13 @@ versionados neste repositório.
 
 Honestidade sobre os limites deste deploy:
 
-- **Sem automação de provisionamento.** A infraestrutura foi
-  criada à mão pelo console; não há Terraform nem CloudFormation que a
-  reproduza. Recriar do zero é repetir os passos 1 e 2 deste guia.
+- **Provisionamento só parcialmente automatizado.** As identidades do deploy
+  (OIDC, roles, instance profile) estão em CloudFormation, em
+  [infra/cicd.yml](../infra/cicd.yml). A infraestrutura que serve a aplicação
+  — VPC, EC2, RDS, security groups — foi criada à mão pelo console e não tem
+  template que a reproduza. Recriar do zero ainda é repetir os passos 1 e 2.
 - **Retenção de backup de 1 dia**, teto do plano gratuito da conta. A
   compensação é o snapshot manual antes de cada evento de risco — ver *Backup*
   no passo 8.
-- **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
-  Um workflow do GitHub Actions que faça isso sozinho é um passo natural
-  depois que o deploy manual estiver de pé.
 - **Uma instância só.** Sem redundância: se ela cair, o sistema cai. É
   adequado ao escopo do projeto e não deve ser vendido como outra coisa.
