@@ -46,7 +46,7 @@ alcançá-la por fora pulando o proxy.
 
 ## Estado atual
 
-No ar desde **09/11/2026** em **http://52.71.237.16**, na versão `1.6.0`.
+No ar desde **09/11/2026** em **http://52.71.237.16**, na versão `1.6.1`.
 
 | Recurso | Valor |
 |---|---|
@@ -61,6 +61,11 @@ profunda do React Router, `Cache-Control` único nos assets, e os dois limites
 de corpo respondendo 413 — o do nginx (2 MB) e o da aplicação (1 MB, com a
 mensagem que orienta a dividir a planilha). Zero reinícios nos dois
 contêineres.
+
+Ainda em **HTTP**: o domínio `controlog.app` foi registrado, mas o Elastic IP
+e o registro `A` faltam, e é deles que depende a emissão do certificado (ver
+passo 6). Os arquivos do HTTPS já estão no repositório e validados com
+`docker compose config`.
 
 O que ainda não foi exercitado em produção: carga real, falha do RDS e
 restauração de snapshot.
@@ -270,40 +275,89 @@ Logins criados (senha `controlog123` nos dois): `gestor@controlog.com` e
 
 Nesse ponto o sistema já responde em `http://SEU-IP`.
 
-## 6. HTTPS (recomendado antes de apresentar)
+## 6. HTTPS
 
-Sem certificado o navegador marca o site como "Não seguro", e a tela de login
-pede senha — é o tipo de detalhe que pesa numa avaliação.
+Sem certificado o navegador marca de "Não seguro" justamente a tela que pede
+senha — o tipo de detalhe que pesa numa avaliação.
 
-Precisa de um domínio. Se não tiver, um subdomínio gratuito no
-[DuckDNS](https://www.duckdns.org) resolve e aponta para o Elastic IP.
+Os dois arquivos já existem no repositório: `Caddyfile` e
+`docker-compose.https.yml`. O Caddy entra **na frente** do nginx em vez de
+substituí-lo: termina o TLS e encaminha para o nginx, que continua servindo o
+SPA e encaminhando `/api`. Trocar um pelo outro daria o mesmo resultado ao
+custo de reescrever — e manter em dois lugares — as regras de cache, o
+`client_max_body_size` e o fallback do React Router que já estão no
+`nginx.conf`.
 
-O caminho mais curto é trocar o nginx pelo **Caddy**, que obtém e renova o
-certificado sozinho. Na instância, crie um `Caddyfile`:
+### Pré-requisitos
 
+**1. Elastic IP.** O IP público da EC2 muda a cada stop/start, e um registro
+de DNS apontando para um IP que mudou é um site fora do ar. EC2 → *Elastic
+IPs* → *Allocate*, depois *Actions → Associate* na instância. Desde 2024 todo
+IPv4 público é cobrado, então associar o Elastic IP só substitui o IP
+automático, sem custo a mais; o que custa é deixá-lo alocado sem associar.
+
+**2. Registro `A` no DNS**, apontando o domínio — e `www`, se mantiver o
+redirecionamento do `Caddyfile` — para o Elastic IP. Confirme a propagação
+antes de subir, com `nslookup seu-dominio.app`. Na Cloudflare o registro tem
+de ficar como **DNS only** (nuvem cinza): com o proxy ligado, a Cloudflare
+termina o TLS por conta própria e o desafio do Let's Encrypt não chega ao
+Caddy.
+
+**3. Porta 443 aberta** no security group da instância. A 80 continua
+necessária depois da emissão: é por ela que o desafio HTTP-01 é validado nas
+renovações, e que o Caddy redireciona `http` → `https`.
+
+**4. Três variáveis no `.env.production`:**
+
+```bash
+CONTROLOG_DOMAIN="seu-dominio.app"
+CORS_ORIGIN="https://seu-dominio.app"
+TRUST_PROXY=2
 ```
-seu-dominio.duckdns.org {
-    root * /srv
-    encode gzip
-    handle /api/* {
-        reverse_proxy api:3333
-    }
-    handle /health {
-        reverse_proxy api:3333
-    }
-    handle {
-        try_files {path} /index.html
-        file_server
-    }
-}
+
+`TRUST_PROXY=2` não é detalhe de arrumação. Com o Caddy na cadeia, o nginx
+passa a mandar `X-Forwarded-For: <cliente>, <caddy>`, e o Express configurado
+para confiar em 1 salto leria o IP do contêiner do Caddy — o rate limiter
+trataria todos os usuários como um cliente só, sem nada no log explicando por
+quê. `controlog-backend/tests/trustProxy.test.js` prende essa aritmética.
+
+### Subir
+
+```bash
+cd controlog
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production up -d
 ```
 
-e um `docker-compose.https.yml` que substitua o serviço `web` por um Caddy
-montando o `dist/` e as portas 80/443. O certificado é emitido no primeiro
-acesso.
+O `--env-file` é obrigatório aqui, e não era no deploy em HTTP: o domínio é
+lido na interpolação do próprio arquivo do Compose, e a interpolação não
+enxerga o `env_file` dos serviços.
 
-> Esta parte está descrita, não montada: depende de um domínio que ainda não
-> existe. Quando você tiver o subdomínio, eu monto os dois arquivos.
+O certificado é pedido na subida. Para acompanhar:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production logs -f caddy
+```
+
+`certificate obtained successfully` é o que se espera ver.
+
+> Ao testar a configuração, descomente o `acme_ca` de homologação no
+> `Caddyfile`. A cota de produção da Let's Encrypt é de 5 certificados por
+> domínio por semana, e um punhado de tentativas erradas queima o domínio até
+> a semana seguinte.
+
+### Conferir
+
+```bash
+# 200, e o certificado válido
+curl -sI https://seu-dominio.app | head -1
+
+# o acesso em http deve redirecionar para https
+curl -sI http://seu-dominio.app | grep -i location
+
+# a API pelo caminho novo
+curl -s https://seu-dominio.app/health
+```
+
 
 ## 7. Atualizar o deploy
 
@@ -394,7 +448,9 @@ Honestidade sobre os limites deste deploy:
 - **Sem automação de provisionamento.** A infraestrutura foi
   criada à mão pelo console; não há Terraform nem CloudFormation que a
   reproduza. Recriar do zero é repetir os passos 1 e 2 deste guia.
-- **HTTPS está descrito, não montado** (ver passo 6).
+- **Ainda em HTTP.** O `Caddyfile` e o `docker-compose.https.yml` estão
+  prontos e validados, mas o certificado só pode ser emitido depois do Elastic
+  IP e do registro `A` — ver passo 6.
 - **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
   Um workflow do GitHub Actions que faça isso sozinho é um passo natural
   depois que o deploy manual estiver de pé.

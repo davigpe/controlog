@@ -11,11 +11,12 @@ import { router } from './routes/index.js';
 export function createApp() {
   const app = express();
 
-  // Necessário em qualquer plataforma que rode atrás de um proxy reverso
-  // (Vercel, entre outras) — sem isso, o Express não confia no cabeçalho
-  // X-Forwarded-For, e o express-rate-limit (abaixo) não consegue
-  // identificar o IP de quem fez a requisição.
-  app.set('trust proxy', 1);
+  // Atrás de um proxy reverso, o IP real de quem chamou só existe no
+  // X-Forwarded-For; sem confiar nesse cabeçalho, o express-rate-limit
+  // (abaixo) não distingue um usuário do outro. Quantos saltos confiar
+  // depende da pilha de deploy, por isso vem do ambiente — ver TRUST_PROXY
+  // em config/env.js.
+  app.set('trust proxy', env.trustProxy);
 
   app.use(helmet());
   app.use(
