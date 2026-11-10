@@ -67,6 +67,10 @@ e o registro `A` faltam, e é deles que depende a emissão do certificado (ver
 passo 6). Os arquivos do HTTPS já estão no repositório e validados com
 `docker compose config`.
 
+Backup automático do RDS com retenção de **1 dia**, o teto do plano gratuito
+da conta (ver *Backup* no passo 8). Orçamento de US$ 10/mês com alertas em
+85% real, 100% previsto e 100% real.
+
 O que ainda não foi exercitado em produção: carga real, falha do RDS e
 restauração de snapshot.
 
@@ -325,17 +329,24 @@ quê. `controlog-backend/tests/trustProxy.test.js` prende essa aritmética.
 
 ```bash
 cd controlog
-docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production up -d
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production up -d --build
 ```
+
+> Na sua máquina existe o atalho `npm run prod:up:https`, mas **não na
+> instância**: lá o Node nunca foi instalado, porque o build acontece dentro
+> do contêiner. No servidor, use a linha do Compose acima.
 
 O `--env-file` é obrigatório aqui, e não era no deploy em HTTP: o domínio é
 lido na interpolação do próprio arquivo do Compose, e a interpolação não
-enxerga o `env_file` dos serviços.
+enxerga o `env_file` dos serviços. Errar esse argumento faz o Compose abortar
+com uma mensagem clara, em vez de subir o Caddy sem domínio.
 
 O certificado é pedido na subida. Para acompanhar:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production logs -f caddy
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production logs -f caddy
 ```
 
 `certificate obtained successfully` é o que se espera ver.
@@ -384,10 +395,28 @@ docker compose -f docker-compose.prod.yml restart api
 docker compose -f docker-compose.prod.yml down
 ```
 
-**Backup.** O RDS faz snapshot automático se você habilitar na criação
-(retenção de 7 dias é suficiente aqui). Com o perfil `db-local` não há backup
-nenhum: você precisaria agendar um `pg_dump` por conta própria. É o principal
-argumento a favor do RDS.
+**Backup.** O RDS faz snapshot automático diário, e a retenção deste deploy
+está em **1 dia** — não por escolha, mas porque é o máximo que o plano
+gratuito da conta aceita; subir para 7 foi recusado pela própria AWS, e só um
+upgrade de plano remove o limite. Na prática isso significa que um problema
+percebido com mais de um dia de atraso pode não ter snapshot anterior a ele.
+
+A compensação não custa nada: **snapshot manual** antes de qualquer coisa
+arriscada — uma apresentação, uma migration nova, uma mudança de
+infraestrutura. O snapshot manual não obedece à janela de retenção e fica
+guardado até você apagar.
+
+```bash
+# No console: RDS → controlog-db → Actions → Take snapshot
+# Ou, se o CLI tiver permissão de RDS:
+aws rds create-db-snapshot \
+  --db-instance-identifier controlog-db \
+  --db-snapshot-identifier controlog-db-antes-da-apresentacao
+```
+
+Com o perfil `db-local` não há backup nenhum: você precisaria agendar um
+`pg_dump` por conta própria. É o principal argumento a favor do RDS, mesmo
+com a retenção curta.
 
 **Acessar o banco de fora.** O RDS não tem acesso público, então use um túnel
 pela EC2:
