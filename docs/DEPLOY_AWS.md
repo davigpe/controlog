@@ -46,26 +46,35 @@ alcançá-la por fora pulando o proxy.
 
 ## Estado atual
 
-No ar desde **09/11/2026** em **http://52.71.237.16**, na versão `1.6.1`.
+No ar desde **09/11/2026** em **https://controlog.app**, na versão `1.7.0`.
 
 | Recurso | Valor |
 |---|---|
 | EC2 | `t3.micro`, Amazon Linux 2023, 2 vCPU, 913 MiB + 2 GiB de swap |
 | RDS | `controlog-db`, PostgreSQL, sem acesso público (IP privado na VPC) |
 | Região | `us-east-1` |
+| IP | Elastic IP `35.173.160.71` |
+| Domínio | `controlog.app`, registrado na Cloudflare, DNS only |
+| TLS | Let's Encrypt, renovado pelo Caddy; `www` redireciona para o apex |
 
 Conferido na subida: as sete migrations aplicadas no RDS por TLS
 (`sslmode=require`), seed executado, login pelo proxy, categorias de veículo
 e o filtro por categoria, o relatório de rotas do dia, fallback de rota
 profunda do React Router, `Cache-Control` único nos assets, e os dois limites
 de corpo respondendo 413 — o do nginx (2 MB) e o da aplicação (1 MB, com a
-mensagem que orienta a dividir a planilha). Zero reinícios nos dois
-contêineres.
+mensagem que orienta a dividir a planilha). Zero reinícios nos três
+contêineres (`api`, `web` e `caddy`).
 
-Ainda em **HTTP**: o domínio `controlog.app` foi registrado, mas o Elastic IP
-e o registro `A` faltam, e é deles que depende a emissão do certificado (ver
-passo 6). Os arquivos do HTTPS já estão no repositório e validados com
-`docker compose config`.
+Conferido na virada para HTTPS: certificado válido nos dois nomes, `http`
+respondendo 308 para `https`, `www` respondendo 301 para o apex, HSTS de um
+ano, `Cache-Control` único nos assets e `no-store` no `index.html`, fallback de
+rota profunda, e os dois limites de corpo ainda em 413.
+
+O `TRUST_PROXY=2` foi verificado de ponta a ponta, não só no teste unitário:
+requisições de dois IPs de origem diferentes caem em baldes separados do rate
+limiter (299→298 de um, 294→293 do outro), e um `X-Forwarded-For` forjado não
+cria balde próprio. Fosse o valor errado, os dois IPs compartilhariam o balde
+do contêiner do Caddy.
 
 Backup automático do RDS com retenção de **1 dia**, o teto do plano gratuito
 da conta (ver *Backup* no passo 8). Orçamento de US$ 10/mês com alertas em
@@ -477,9 +486,9 @@ Honestidade sobre os limites deste deploy:
 - **Sem automação de provisionamento.** A infraestrutura foi
   criada à mão pelo console; não há Terraform nem CloudFormation que a
   reproduza. Recriar do zero é repetir os passos 1 e 2 deste guia.
-- **Ainda em HTTP.** O `Caddyfile` e o `docker-compose.https.yml` estão
-  prontos e validados, mas o certificado só pode ser emitido depois do Elastic
-  IP e do registro `A` — ver passo 6.
+- **Retenção de backup de 1 dia**, teto do plano gratuito da conta. A
+  compensação é o snapshot manual antes de cada evento de risco — ver *Backup*
+  no passo 8.
 - **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
   Um workflow do GitHub Actions que faça isso sozinho é um passo natural
   depois que o deploy manual estiver de pé.
