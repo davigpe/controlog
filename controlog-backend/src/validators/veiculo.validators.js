@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { booleanoDeQuery } from './comum.validators.js';
+
 // Mesma lista (e mesma ordem, do menor porte ao maior) do enum
 // VeiculoCategoria no schema.prisma. Fica exportada porque o filtro da
 // listagem e os dois schemas de escrita precisam dela.
@@ -31,7 +33,7 @@ export const listVeiculosQuerySchema = z.object({
   busca: z.string().trim().optional(),
   status: z.enum(['DISPONIVEL', 'MANUTENCAO', 'INATIVO']).optional(),
   categoria: z.enum(CATEGORIAS_VEICULO).optional(),
-  emRota: z.coerce.boolean().optional(),
+  emRota: booleanoDeQuery.optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
 });

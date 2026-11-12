@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { booleanoDeQuery } from './comum.validators.js';
+
 export const createMotoristaSchema = z.object({
   nome: z.string().trim().min(2, 'Nome deve ter ao menos 2 caracteres.'),
   cnh: z.string().trim().min(5, 'CNH inválida.'),
@@ -53,7 +55,7 @@ export function validarLinhaMotorista(linha) {
 export const listMotoristasQuerySchema = z.object({
   busca: z.string().trim().optional(),
   status: z.enum(['ATIVO', 'INATIVO']).optional(),
-  emRota: z.coerce.boolean().optional(),
+  emRota: booleanoDeQuery.optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
 });
