@@ -137,7 +137,7 @@ export default function Motoristas() {
     <div className="space-y-5">
 
       {/* ── Cabeçalho ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Motoristas</h1>
           <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} registros encontrados</p>
@@ -145,14 +145,14 @@ export default function Motoristas() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setImportando(true)}
-            className="flex items-center gap-2 border border-gray-200 bg-white hover:border-blue-400 hover:text-blue-600 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto border border-gray-200 bg-white hover:border-blue-400 hover:text-blue-600 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
           >
             <FileUp size={16} />
             Importar planilha
           </button>
           <button
             onClick={() => { setEditando(null); setFormAberto(true) }}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
           >
             <Plus size={16} />
             Novo Motorista

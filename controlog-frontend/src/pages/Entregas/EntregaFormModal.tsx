@@ -63,7 +63,7 @@ export default function EntregaFormModal({ open, entregaEditando, onClose, onSav
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="entrega-codigo">Código</Label>
               <Input id="entrega-codigo" {...register('codigo', { required: true })} placeholder="EN-001" />
@@ -90,7 +90,7 @@ export default function EntregaFormModal({ open, entregaEditando, onClose, onSav
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="entrega-motorista">Motorista</Label>
               <Select value={watch('motoristaId')} onValueChange={(v) => setValue('motoristaId', v)}>

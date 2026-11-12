@@ -83,7 +83,7 @@ export default function RotaModal({ open, onClose, onSave, rotaEditando, saving 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="rota-codigo">Código</Label>
               <Input id="rota-codigo" {...register('codigo')} placeholder="RT-001" />
@@ -160,7 +160,7 @@ export default function RotaModal({ open, onClose, onSave, rotaEditando, saving 
               Coordenadas geográficas (latitude/longitude) — usadas para exibir a rota no mapa.
               Consulte em <span className="font-medium">google.com/maps</span> se não souber de cor.
             </p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="rota-lat-origem">Latitude origem</Label>
                 <Input id="rota-lat-origem" type="number" step="any" {...register('latOrigem', { valueAsNumber: true })} placeholder="-26.3045" />

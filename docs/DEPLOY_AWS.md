@@ -445,6 +445,26 @@ Com o perfil `db-local` não há backup nenhum: você precisaria agendar um
 `pg_dump` por conta própria. É o principal argumento a favor do RDS, mesmo
 com a retenção curta.
 
+**Os comprovantes de entrega não estão nesse backup.** As fotos e PDFs ficam
+no volume `controlog-comprovantes`, num disco da EC2; o snapshot do RDS cobre
+só o banco, que guarda apenas os metadados. Restaurar o banco sem o volume
+devolve entregas concluídas cujo comprovante não abre mais — o service
+responde 404 com texto próprio justamente para esse caso ficar legível em vez
+de parecer defeito.
+
+Para copiar o volume antes de um evento de risco:
+
+```bash
+docker run --rm \
+  -v controlog_controlog-comprovantes:/origem:ro \
+  -v "$PWD":/destino alpine \
+  tar czf /destino/comprovantes-$(date +%F).tar.gz -C /origem .
+```
+
+Guardar isso fora da instância (S3, ou a sua máquina) é o que fecha a lacuna.
+Enquanto não houver essa rotina, vale dizer na defesa que a prova de entrega
+tem ponto único de falha — é uma limitação de escopo, não um descuido.
+
 **Acessar o banco de fora.** O RDS não tem acesso público, então use um túnel
 pela EC2:
 
@@ -599,5 +619,8 @@ Honestidade sobre os limites deste deploy:
 - **Retenção de backup de 1 dia**, teto do plano gratuito da conta. A
   compensação é o snapshot manual antes de cada evento de risco — ver *Backup*
   no passo 8.
+- **Comprovantes de entrega sem backup automático.** Os arquivos ficam num
+  volume do Docker na instância, fora do snapshot do RDS. O procedimento de
+  cópia manual está em *Backup*, no passo 8.
 - **Uma instância só.** Sem redundância: se ela cair, o sistema cai. É
   adequado ao escopo do projeto e não deve ser vendido como outra coisa.

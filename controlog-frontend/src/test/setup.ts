@@ -16,11 +16,14 @@ afterEach(() => {
   cleanup();
 });
 
-// jsdom não implementa matchMedia — usado por next-themes/sonner.
+// jsdom não implementa matchMedia — usado por next-themes/sonner e pelo
+// useTelaGrande. Consultas de largura mínima respondem `true`: o jsdom não tem
+// viewport de verdade, e os testes de layout foram escritos assumindo desktop.
+// Um teste que precise do celular sobrescreve window.matchMedia localmente.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({
-    matches: false,
+    matches: query.includes('min-width'),
     media: query,
     onchange: null,
     addListener: () => {},
