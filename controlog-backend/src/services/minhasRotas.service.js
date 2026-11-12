@@ -1,4 +1,5 @@
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../utils/AppError.js';
+import { toComprovanteResponse } from './comprovante.service.js';
 
 // Visão restrita do motorista logado: só as rotas atribuídas a ele, cada uma
 // com as próprias entregas. A única escrita que o motorista pode fazer é
@@ -16,6 +17,10 @@ function toEntregaResponse(entrega) {
     dataEfetiva: entrega.dataEfetiva,
     motivoInsucesso: entrega.motivoInsucesso ?? null,
     observacao: entrega.observacao ?? null,
+    // Sempre presente, mesmo vazio: a tela usa o tamanho desta lista para
+    // decidir se o botao de concluir fica habilitado, e `undefined` ali
+    // viraria "0 comprovantes" em uma entrega que tem.
+    comprovantes: (entrega.comprovantes ?? []).map(toComprovanteResponse),
   };
 }
 
@@ -50,6 +55,16 @@ export function createMinhasRotasService(prisma) {
               dataEfetiva: true,
               motivoInsucesso: true,
               observacao: true,
+              comprovantes: {
+                orderBy: { criadoEm: 'asc' },
+                select: {
+                  id: true,
+                  nomeOriginal: true,
+                  mimeType: true,
+                  tamanho: true,
+                  criadoEm: true,
+                },
+              },
             },
           },
         },
@@ -98,9 +113,20 @@ export function createMinhasRotasService(prisma) {
         throw new ValidationError('Uma entrega cancelada não pode ser concluída.');
       }
 
+      // RN — concluir exige prova de que a entrega aconteceu. A checagem é
+      // aqui, e nao so no botao desabilitado da tela: a tela e conveniencia,
+      // e um PATCH direto na API contornaria qualquer bloqueio visual.
+      const comprovantes = await prisma.comprovanteEntrega.count({ where: { entregaId } });
+      if (comprovantes === 0) {
+        throw new ValidationError(
+          'Anexe ao menos um comprovante antes de concluir a entrega.'
+        );
+      }
+
       const atualizada = await prisma.entrega.update({
         where: { id: entregaId },
         data: { status: 'ENTREGUE', dataEfetiva: new Date() },
+        include: { comprovantes: { orderBy: { criadoEm: 'asc' } } },
       });
 
       return toEntregaResponse(atualizada);
@@ -136,6 +162,10 @@ export function createMinhasRotasService(prisma) {
           observacao: observacao ?? null,
           dataEfetiva: new Date(),
         },
+        // Insucesso nao exige comprovante, mas se o motorista ja tinha anexado
+        // algo antes de desistir, a resposta precisa devolver a lista como ela
+        // esta — senao a tela apagaria os anexos da visao dele.
+        include: { comprovantes: { orderBy: { criadoEm: 'asc' } } },
       });
 
       return toEntregaResponse(atualizada);

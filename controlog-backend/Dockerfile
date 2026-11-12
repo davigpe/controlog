@@ -32,8 +32,14 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY src ./src
 
-# Usuário sem privilégios que já vem na imagem oficial. A aplicação só lê o
-# que foi copiado, então não precisa ser dona de nada.
+# Onde os comprovantes de entrega sao gravados. Criado aqui, com dono `node`,
+# porque um volume nomeado herda dono e permissao do diretorio da imagem na
+# primeira vez que e montado — criar so no compose deixaria a pasta como root
+# e a aplicacao, que roda sem privilegio, nao conseguiria escrever.
+RUN mkdir -p /app/uploads/comprovantes && chown -R node:node /app/uploads
+
+# Usuário sem privilégios que já vem na imagem oficial. Fora de /app/uploads a
+# aplicação só lê o que foi copiado, então não precisa ser dona de mais nada.
 USER node
 
 EXPOSE 3333

@@ -21,6 +21,11 @@ services:
       PORT: "3333"
     expose:
       - "3333"
+    volumes:
+      # Os comprovantes precisam sobreviver ao deploy. A imagem e recriada a
+      # cada build, entao um arquivo gravado dentro dela sumiria no deploy
+      # seguinte, levando junto a prova de entregas ja concluidas.
+      - controlog-comprovantes:/app/uploads/comprovantes
     depends_on:
       db:
         condition: service_healthy
@@ -94,4 +99,5 @@ services:
       retries: 10
 
 volumes:
+  controlog-comprovantes:
   controlog-db:

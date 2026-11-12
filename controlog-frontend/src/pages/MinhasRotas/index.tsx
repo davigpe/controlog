@@ -3,6 +3,7 @@ import { AlertTriangle, Calendar, CheckCircle, Clock, MapPin, Package, Truck, XC
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
 import { useConcluirEntrega, useMinhasRotas, useRegistrarInsucesso } from './api'
+import ComprovantesEntrega from './ComprovantesEntrega'
 import InsucessoModal from './InsucessoModal'
 import { MOTIVO_INSUCESSO_LABEL } from './insucesso'
 import type { EntregaDaRota, MotivoInsucesso, StatusEntrega, StatusRota } from './types'
@@ -173,52 +174,91 @@ export default function MinhasRotas() {
                   <p className="text-sm text-gray-600">Esta rota ainda não tem entregas vinculadas.</p>
                 ) : (
                   <ul className="divide-y divide-gray-100">
-                    {rota.entregas.map((entrega) => (
-                      <li key={entrega.id} className="py-2.5 flex flex-wrap items-center gap-3 text-sm">
-                        <span className="font-medium text-gray-700 shrink-0">{entrega.codigo}</span>
-                        <span className="text-gray-600 min-w-0 flex-1 truncate">{entrega.destino}</span>
-                        <span className="text-xs text-gray-600 shrink-0">
-                          {entrega.dataEfetiva
-                            ? `${entrega.status === 'NAO_ENTREGUE' ? 'Tentativa em' : 'Entregue em'} ${new Date(entrega.dataEfetiva).toLocaleDateString('pt-BR')}`
-                            : new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')}
-                        </span>
-                        <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${entregaStatusStyle[entrega.status]}`}>
-                          {entregaStatusIcon[entrega.status]}
-                          {entregaStatusLabel[entrega.status]}
-                        </span>
-                        {/* NAO_ENTREGUE continua aceitando conclusão: o motorista
-                            pode voltar ao endereço e entregar na segunda tentativa. */}
-                        {(entrega.status === 'PENDENTE' ||
-                          entrega.status === 'EM_TRANSITO' ||
-                          entrega.status === 'NAO_ENTREGUE') && (
-                          <button
-                            onClick={() => handleConcluir(entrega.id, entrega.codigo)}
-                            disabled={concluirMutation.isPending}
-                            aria-label={`Marcar entrega ${entrega.codigo} como concluída`}
-                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
-                          >
-                            <CheckCircle size={13} />
-                            Concluir
-                          </button>
-                        )}
-                        {(entrega.status === 'PENDENTE' || entrega.status === 'EM_TRANSITO') && (
-                          <button
-                            onClick={() => setEntregaInsucesso(entrega)}
-                            aria-label={`Registrar insucesso na entrega ${entrega.codigo}`}
-                            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-amber-600 text-amber-700 hover:bg-amber-50 transition-colors"
-                          >
-                            <AlertTriangle size={13} />
-                            Não entregue
-                          </button>
-                        )}
+                    {rota.entregas.map((entrega) => {
+                      // NAO_ENTREGUE continua aceitando conclusão: o motorista
+                      // pode voltar ao endereço e entregar na segunda tentativa.
+                      const podeConcluir =
+                        entrega.status === 'PENDENTE' ||
+                        entrega.status === 'EM_TRANSITO' ||
+                        entrega.status === 'NAO_ENTREGUE'
+                      const podeRegistrarInsucesso =
+                        entrega.status === 'PENDENTE' || entrega.status === 'EM_TRANSITO'
+                      const semComprovante = (entrega.comprovantes ?? []).length === 0
+
+                      return (
+                      <li key={entrega.id} className="py-3 text-sm">
+                        {/* Uma coluna no celular, linha no desktop: no telefone
+                            o destino é a informação que o motorista precisa ler
+                            inteira, e espremê-lo numa linha com mais quatro
+                            elementos o reduzia a reticências. */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <span className="font-medium text-gray-700 shrink-0">{entrega.codigo}</span>
+                          <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${entregaStatusStyle[entrega.status]}`}>
+                            {entregaStatusIcon[entrega.status]}
+                            {entregaStatusLabel[entrega.status]}
+                          </span>
+                          <span className="text-xs text-gray-600 sm:ml-auto shrink-0">
+                            {entrega.dataEfetiva
+                              ? `${entrega.status === 'NAO_ENTREGUE' ? 'Tentativa em' : 'Entregue em'} ${new Date(entrega.dataEfetiva).toLocaleDateString('pt-BR')}`
+                              : new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+
+                        <p className="text-gray-600 mt-1 flex items-start gap-1.5">
+                          <MapPin size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                          <span className="min-w-0">{entrega.destino}</span>
+                        </p>
+
                         {entrega.motivoInsucesso && (
-                          <p className="w-full text-xs text-amber-800">
+                          <p className="text-xs text-amber-800 mt-1.5">
                             {MOTIVO_INSUCESSO_LABEL[entrega.motivoInsucesso]}
                             {entrega.observacao ? ` — ${entrega.observacao}` : ''}
                           </p>
                         )}
+
+                        {(podeConcluir || (entrega.comprovantes ?? []).length > 0) && (
+                          <div className="mt-2.5">
+                            <ComprovantesEntrega entrega={entrega} podeEditar={podeConcluir} />
+                          </div>
+                        )}
+
+                        {(podeConcluir || podeRegistrarInsucesso) && (
+                          <div className="mt-2.5 flex flex-col sm:flex-row gap-2">
+                            {podeConcluir && (
+                              <button
+                                onClick={() => handleConcluir(entrega.id, entrega.codigo)}
+                                disabled={concluirMutation.isPending || semComprovante}
+                                aria-label={`Marcar entrega ${entrega.codigo} como concluída`}
+                                // O title explica o bloqueio: um botão apagado
+                                // sem motivo visível parece defeito do app.
+                                title={semComprovante ? 'Anexe ao menos um comprovante para concluir' : undefined}
+                                className="flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <CheckCircle size={13} />
+                                Concluir
+                              </button>
+                            )}
+                            {podeRegistrarInsucesso && (
+                              <button
+                                onClick={() => setEntregaInsucesso(entrega)}
+                                aria-label={`Registrar insucesso na entrega ${entrega.codigo}`}
+                                className="flex items-center justify-center gap-1.5 px-3 py-2.5 sm:py-1.5 rounded-lg text-xs font-medium border border-amber-600 text-amber-700 hover:bg-amber-50 transition-colors"
+                              >
+                                <AlertTriangle size={13} />
+                                Não entregue
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {podeConcluir && semComprovante && (
+                          <p className="mt-1.5 text-xs text-gray-500">
+                            Anexe a foto do comprovante para liberar a conclusão.
+                          </p>
+                        )}
                       </li>
-                    ))}
+                      )
+                    })}
                   </ul>
                 )}
               </div>

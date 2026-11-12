@@ -181,7 +181,38 @@ model Entrega {
   motoristaId String    @map("motorista_id")
   motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
 
+  comprovantes ComprovanteEntrega[]
+
   @@map("entregas")
+}
+
+// Prova de que a entrega aconteceu: foto do volume no destino, canhoto
+// assinado, print do aceite. Concluir exige pelo menos um — a regra está em
+// minhasRotas.service, porque é lá que a conclusão acontece.
+//
+// Varios por entrega de proposito: na pratica o motorista fotografa o volume
+// e o comprovante assinado, e obrigar a escolher um so levaria a juntar tudo
+// numa foto ruim.
+model ComprovanteEntrega {
+  id String @id @default(uuid())
+
+  // Nome gerado pelo servidor, e o unico usado para montar caminho em disco.
+  // O nome que o cliente envia vai para `nomeOriginal`, so para exibicao: um
+  // "../../.env" vindo do navegador viraria escrita fora da pasta.
+  arquivo      String
+  nomeOriginal String @map("nome_original")
+  mimeType     String @map("mime_type")
+  tamanho      Int
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  // Cascade: apagada a entrega, os arquivos perdem dono. A remocao do arquivo
+  // em disco e feita pelo service antes de apagar a linha.
+  entregaId String  @map("entrega_id")
+  entrega   Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+
+  @@index([entregaId])
+  @@map("comprovantes_entrega")
 }
 
 model Plano {

@@ -8,6 +8,14 @@ export type MotivoInsucesso =
   | 'AVARIA'
   | 'OUTRO'
 
+export interface Comprovante {
+  id: string
+  nomeOriginal: string
+  mimeType: string
+  tamanho: number
+  criadoEm: string
+}
+
 export interface EntregaDaRota {
   id: string
   codigo: string
@@ -17,6 +25,10 @@ export interface EntregaDaRota {
   dataEfetiva: string | null
   motivoInsucesso: MotivoInsucesso | null
   observacao: string | null
+  // Sempre presente, mesmo vazia: e o tamanho dela que libera o botao de
+  // concluir, e um `undefined` aqui pareceria "sem comprovante" numa entrega
+  // que tem.
+  comprovantes: Comprovante[]
 }
 
 export interface MinhaRota {

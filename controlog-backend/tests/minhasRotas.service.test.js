@@ -12,6 +12,10 @@ function buildPrismaMock() {
     motorista: { findUnique: jest.fn() },
     rota: { findMany: jest.fn() },
     entrega: { findUnique: jest.fn(), update: jest.fn() },
+    // Por padrao a entrega ja tem comprovante: a regra de anexo obrigatorio
+    // tem testes proprios, e sem este default todos os testes de conclusao
+    // passariam a medir a regra nova em vez do que pretendem medir.
+    comprovanteEntrega: { count: jest.fn().mockResolvedValue(1) },
   };
 }
 
@@ -130,10 +134,12 @@ describe('minhasRotas.service — concluirEntrega', () => {
     const service = createMinhasRotasService(prisma);
     const entrega = await service.concluirEntrega('u1', 'e1');
 
-    expect(prisma.entrega.update).toHaveBeenCalledWith({
-      where: { id: 'e1' },
-      data: expect.objectContaining({ status: 'ENTREGUE', dataEfetiva: expect.any(Date) }),
-    });
+    expect(prisma.entrega.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'e1' },
+        data: expect.objectContaining({ status: 'ENTREGUE', dataEfetiva: expect.any(Date) }),
+      })
+    );
     expect(entrega.status).toBe('ENTREGUE');
     expect(entrega.dataEfetiva).not.toBeNull();
   });
