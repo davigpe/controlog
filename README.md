@@ -13,7 +13,7 @@ Este é o repositório do projeto de portfólio desenvolvido para a disciplina d
 O Controlog substitui o controle de rotas e entregas feito hoje em planilhas e WhatsApp por uma plataforma web única, permitindo:
 
 * Cadastro e acompanhamento de rotas, motoristas e veículos
-* Carteira de clientes com endereço geocodificado: cada cliente tem um código identificador (CLI-XXX) e uma coordenada cadastrada uma vez. Os pedidos nascem no endereço do cliente em vez de num ponto sorteado, então o endereço escrito corresponde ao ponto no mapa — e vários pedidos do mesmo cliente caem exatamente no mesmo lugar
+* Carteira de clientes com endereço real: cada cliente tem um código identificador (CLI-XXX) e uma coordenada cadastrada uma vez. A base de demonstração traz 200 clientes, 10 em cada um de 20 bairros de Joinville, com endereços extraídos do OpenStreetMap — 17 km de extensão norte-sul (ver [docs/DADOS_DE_DEMONSTRACAO.md](docs/DADOS_DE_DEMONSTRACAO.md)). Os pedidos nascem no endereço do cliente em vez de num ponto sorteado, então o endereço escrito corresponde ao ponto no mapa — e vários pedidos do mesmo cliente caem exatamente no mesmo lugar
 * Mapa com contador por ponto: quando o mesmo endereço concentra mais de um pedido (o cliente comprou vários itens), o marcador mostra quantos são e o balão lista cada pedido, em vez de empilhar pinos invisíveis um sobre o outro
 * Central de ajuda com perguntas frequentes filtradas por perfil, respondidas pelas regras que o sistema de fato aplica
 * Gestão do ciclo de vida das entregas (pendente → em trânsito → entregue/cancelada)
