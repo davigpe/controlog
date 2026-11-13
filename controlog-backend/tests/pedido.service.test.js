@@ -8,6 +8,22 @@ function buildPrismaMock() {
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
     },
+    // Os pedidos passaram a nascer no endereço de um cliente cadastrado, então
+    // a geração consulta a carteira. Dois clientes bastam aqui: o que estes
+    // testes medem é a quantidade e a forma do pedido, não o sorteio — a
+    // vinculação ao cliente tem testes próprios em cliente.service.test.js.
+    cliente: {
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'c1', nome: 'Mercado Bom Preço', endereco: 'Rua das Palmeiras, 120',
+          bairro: 'Centro', lat: -26.303486, lng: -48.844667,
+        },
+        {
+          id: 'c2', nome: 'Farmácia Vida', endereco: 'Rua XV de Novembro, 455',
+          bairro: 'Centro', lat: -26.300811, lng: -48.843885,
+        },
+      ]),
+    },
   };
 }
 

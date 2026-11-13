@@ -60,7 +60,7 @@ cadastro do motorista.
 | Grupo de rotas | Perfis permitidos |
 |---|---|
 | `/api/minhas-rotas` (listagem, `PATCH .../entregas/:id/concluir` e `.../insucesso`) | `MOTORISTA` |
-| `/api/motoristas`, `/veiculos`, `/rotas`, `/entregas`, `/dashboard`, `/relatorios`, `/otimizacao-rotas`, `/pedidos`, `/planos` | `GESTOR`, `OPERADOR` |
+| `/api/clientes`, `/motoristas`, `/veiculos`, `/rotas`, `/entregas`, `/dashboard`, `/relatorios`, `/otimizacao-rotas`, `/pedidos`, `/planos` | `GESTOR`, `OPERADOR` |
 | `POST /api/motoristas/:id/acesso` | `GESTOR` |
 
 No front-end, o mesmo recorte aparece em três lugares: `RequireAuth` recebe os perfis

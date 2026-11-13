@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
 import { authRouter } from './auth.routes.js';
+import { clientesRouter } from './clientes.routes.js';
 import { dashboardRouter } from './dashboard.routes.js';
 import { entregasRouter } from './entregas.routes.js';
 import { minhasRotasRouter } from './minhasRotas.routes.js';
@@ -28,6 +29,7 @@ router.use('/minhas-rotas', requireRole('MOTORISTA'), minhasRotasRouter);
 // nada, então todo este bloco é restrito a gestor e operador.
 const apenasGestao = requireRole('GESTOR', 'OPERADOR');
 
+router.use('/clientes', apenasGestao, clientesRouter);
 router.use('/motoristas', apenasGestao, motoristasRouter);
 router.use('/veiculos', apenasGestao, veiculosRouter);
 router.use('/rotas', apenasGestao, rotasRouter);

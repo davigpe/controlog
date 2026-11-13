@@ -17,7 +17,7 @@ function pedido(id: string, codigo: string): Pedido {
   return {
     id,
     codigo,
-    cliente: 'Cliente Teste',
+    clienteNome: 'Cliente Teste', clienteId: null,
     endereco: 'Rua Teste, 1',
     cidade: 'Centro',
     lat: -26.3,

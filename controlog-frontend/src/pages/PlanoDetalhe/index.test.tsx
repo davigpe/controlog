@@ -93,7 +93,7 @@ function pedido(
   return {
     id,
     codigo,
-    cliente: 'Cliente Teste',
+    clienteNome: 'Cliente Teste', clienteId: null,
     endereco: 'Rua Teste, 1',
     cidade: 'Centro',
     lat: coords.lat,
