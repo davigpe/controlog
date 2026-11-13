@@ -136,7 +136,8 @@ motorista/veículo é verificada automaticamente na tela de Atribuição de Rota
 | ID | Caso de teste | Resultado esperado | Cobertura |
 |---|---|---|---|
 | RF01 | Criar rota informando código, origem, destino, motorista, veículo, data/hora e status | Rota criada com status `ATIVA` por padrão | `tests/rota.service.test.js` |
-| RF01/RN06 | Criar rota sem motorista ou veículo válido | Erro `ValidationError` (422), rota não é criada | `tests/rota.service.test.js` |
+| RF01/RN06 | Criar rota informando um motorista ou veículo que não existe | Erro `ValidationError` (422), rota não é criada | `tests/rota.service.test.js` |
+| RF01/RN06 | Aprovar rota sem motorista e sem veículo | Rota criada com ambos nulos; entregas nascem sem dono | `tests/aprovarRotaSemVinculos.test.js` |
 | RF02 | Editar dados de uma rota existente | Dados atualizados e refletidos no `GET` seguinte | `tests/rota.service.test.js` |
 | RF03/RN08 | Excluir rota sem entregas pendentes vinculadas | Rota removida (204) | `tests/rota.service.test.js` |
 | RF03/RN08 | Excluir rota com entrega `PENDENTE` ou `EM_TRANSITO` vinculada | Erro `ConflictError` (409), rota não é removida | `tests/rota.service.test.js` |
@@ -241,8 +242,11 @@ feedback. Não estavam no RFC: vieram do uso real.
 | RN03 | Excluir motorista com rota `ATIVA` vinculada | `409 Conflict` — "Não é possível excluir um motorista com rotas ativas vinculadas (RN03)" | `tests/motorista.service.test.js` + validado manualmente no navegador (toast de erro) |
 | RN04 | Excluir veículo com rota `ATIVA` vinculada | `409 Conflict` (RN04) | `tests/veiculo.service.test.js` |
 | RN05 | Criar/editar rota com código já usado por outra rota | `409 Conflict` (RN05) | `tests/rota.service.test.js` |
-| RN06 | Criar rota sem origem, destino, motorista ou veículo | Rejeitado na validação (Zod), 422 | `tests/rota.service.test.js` + `src/validators/rota.validators.js` |
-| RN07 | Criar entrega sem rota ou motorista vinculado | `422 Unprocessable Entity` (RN07) | `tests/entrega.service.test.js` |
+| RN06 (revisada) | Criar rota sem origem, destino ou data/hora | Rejeitado na validação (Zod), 422 | `tests/rota.service.test.js` + `src/validators/rota.validators.js` |
+| RN06 (revisada) | Aprovar rota deixando motorista e veículo para depois | Aceito: a atribuição acontece na tela de Atribuição de Rotas | `tests/aprovarRotaSemVinculos.test.js` |
+| RN07 (revisada) | Criar entrega sem rota vinculada | `422 Unprocessable Entity` | `tests/entrega.service.test.js` |
+| RN09 | Marcar veículo próprio junto com um veículo da frota | `422` no service e no validador; constraint `rotas_veiculo_proprio_sem_frota` no banco | `tests/aprovarRotaSemVinculos.test.js` |
+| RN09 | Desatribuir o motorista de uma rota | As entregas da rota também ficam sem motorista | `tests/aprovarRotaSemVinculos.test.js` |
 | RN08 | Excluir rota com entrega `PENDENTE`/`EM_TRANSITO` vinculada | `409 Conflict` (RN08) | `tests/rota.service.test.js` |
 
 ## 5. Casos de teste automatizados do frontend

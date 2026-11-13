@@ -88,8 +88,10 @@ Os testes unitários injetam um Prisma Client mockado diretamente nos services (
 - `POST /api/auth/refresh` — troca um refresh token válido por um novo access token.
 - `GET /api/auth/me` — dados do usuário autenticado.
 - `POST /api/auth/esqueci-senha` — `{ email }`. Sempre responde 200 com mensagem genérica
-  (não revela se o e-mail existe). Não há provedor de e-mail configurado neste projeto —
-  o link de redefinição é registrado no log do servidor em vez de enviado por e-mail.
+  (não revela se o e-mail existe). O link de redefinição é enviado por e-mail pelo Amazon SES;
+  com `EMAIL_TRANSPORTE=registro` (padrão em desenvolvimento) ele vai para o log do servidor.
+  Falha de envio não altera a resposta — pela mesma razão de não revelar quais e-mails existem —,
+  e fica registrada no log com o destinatário.
 - `POST /api/auth/redefinir-senha` — `{ token, novaSenha }`. Token expira em 1h.
 
 Todas as demais rotas sob `/api` exigem o header `Authorization: Bearer <accessToken>` (RN01).
@@ -186,8 +188,9 @@ aceitam `?emRota=true|false` para filtrar por quem tem rota `ATIVA` vinculada no
 | RN03 — não excluir motorista com rota ativa vinculada | `src/services/motorista.service.js` (`remove`) |
 | RN04 — não excluir veículo com rota ativa vinculada | `src/services/veiculo.service.js` (`remove`) |
 | RN05 — código da rota é único | `src/services/rota.service.js` (`create`/`update`) + `@unique` no schema |
-| RN06 — rota exige origem, destino, motorista e veículo | `src/validators/rota.validators.js` (campos obrigatórios) |
-| RN07 — entrega exige rota e motorista vinculados | `src/validators/entrega.validators.js` + `src/services/entrega.service.js` |
+| RN06 (revisada) — rota exige origem, destino e data/hora; motorista e veículo são opcionais | `src/validators/rota.validators.js` |
+| RN07 (revisada) — entrega exige rota vinculada; o motorista acompanha o da rota e pode estar indefinido | `src/validators/entrega.validators.js` + `src/services/entrega.service.js` |
+| RN09 — veículo próprio e veículo da frota são excludentes na mesma rota | `src/services/rota.service.js` + constraint `rotas_veiculo_proprio_sem_frota` |
 | RN08 — não excluir rota com entregas pendentes | `src/services/rota.service.js` (`remove`) |
 
 ## Como o front-end consome esta API

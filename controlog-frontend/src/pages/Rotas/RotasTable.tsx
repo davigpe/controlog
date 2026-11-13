@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { descricaoDoVeiculo, nomeDoMotorista } from './apresentacao'
 import type { Rota } from './types';
 
 const statusConfig = {
@@ -47,8 +48,12 @@ export default function RotasTable({ rotas, onVerDetalhes, onEditar, onExcluir }
                 <tr key={rota.id} className="border-t hover:bg-muted/40 transition-colors">
                   <td className="px-4 py-3 font-medium">{rota.codigo}</td>
                   <td className="px-4 py-3">{rota.origem} → {rota.destino}</td>
-                  <td className="px-4 py-3">{rota.motorista.nome}</td>
-                  <td className="px-4 py-3">{rota.veiculo.modelo} — {rota.veiculo.placa}</td>
+                  <td className={`px-4 py-3${rota.motorista ? '' : ' text-muted-foreground italic'}`}>
+                    {nomeDoMotorista(rota.motorista)}
+                  </td>
+                  <td className={`px-4 py-3${rota.veiculo ? '' : ' text-muted-foreground italic'}`}>
+                    {descricaoDoVeiculo(rota)}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge className={status.className}>{status.label}</Badge>
                   </td>

@@ -29,6 +29,7 @@ const rota: Rota = {
   coordenadasDestino: [-26.28, -48.84],
   motorista: { id: CARLOS, nome: 'Carlos Silva' },
   veiculo: { id: VEICULO, placa: 'ABC-1234', modelo: 'Mercedes Sprinter' },
+  veiculoProprio: false,
   totalEntregas: 3,
   entregasPendentes: 2,
 };
@@ -109,6 +110,10 @@ describe('Atribuicoes', () => {
       expect(mockedApi.put).toHaveBeenCalledWith('/rotas/r1', {
         motoristaId: ANA,
         veiculoId: VEICULO,
+        // Acompanha o veiculoId sempre: a API representa os tres estados do
+        // veiculo em dois campos, e mandar um sem o outro deixaria a rota
+        // num estado que a constraint do banco recusa.
+        veiculoProprio: false,
       })
     );
     expect(await screen.findByText('Rota RT-001 atribuída.')).toBeInTheDocument();
@@ -161,5 +166,76 @@ describe('Atribuicoes', () => {
     renderWithProviders(<Atribuicoes />);
 
     expect(await screen.findByText(/Nenhuma rota aprovada para este filtro/)).toBeInTheDocument();
+  });
+});
+
+describe('Atribuições — motorista e veículo opcionais', () => {
+  beforeEach(() => {
+    mockedApi.get.mockImplementation(async (url: string) => {
+      if (url === '/rotas') return { data: paginated([rota]) };
+      if (url === '/motoristas') return { data: paginated(motoristas) };
+      if (url === '/veiculos') return { data: paginated(veiculos) };
+      return { data: paginated([]) };
+    });
+  });
+
+  // Aprovar a rota antes de saber quem dirige é o caso que motivou tornar o
+  // vínculo opcional; desfazer a atribuição é o mesmo caminho de volta.
+  test('escolher "A definir" no motorista envia null', async () => {
+    const user = userEvent.setup();
+    mockedApi.put.mockResolvedValue({ data: { ...rota, motorista: null } });
+
+    renderWithProviders(<Atribuicoes />);
+    await screen.findByText('RT-001');
+
+    await user.click(screen.getByRole('button', { name: 'Atribuir RT-001' }));
+    await screen.findByRole('dialog', { name: 'Atribuir RT-001' });
+
+    await user.click(screen.getByLabelText('Motorista'));
+    await user.click(await screen.findByRole('option', { name: 'A definir' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar atribuição' }));
+
+    await waitFor(() =>
+      expect(mockedApi.put).toHaveBeenCalledWith('/rotas/r1', {
+        motoristaId: null,
+        veiculoId: VEICULO,
+        veiculoProprio: false,
+      })
+    );
+  });
+
+  test('escolher "Veículo próprio" envia a marcação e zera o veiculoId', async () => {
+    const user = userEvent.setup();
+    mockedApi.put.mockResolvedValue({ data: { ...rota, veiculo: null, veiculoProprio: true } });
+
+    renderWithProviders(<Atribuicoes />);
+    await screen.findByText('RT-001');
+
+    await user.click(screen.getByRole('button', { name: 'Atribuir RT-001' }));
+    await screen.findByRole('dialog', { name: 'Atribuir RT-001' });
+
+    await user.click(screen.getByLabelText('Veículo'));
+    await user.click(await screen.findByRole('option', { name: 'Veículo próprio' }));
+    await user.click(screen.getByRole('button', { name: 'Salvar atribuição' }));
+
+    await waitFor(() =>
+      expect(mockedApi.put).toHaveBeenCalledWith('/rotas/r1', {
+        motoristaId: rota.motorista!.id,
+        veiculoId: null,
+        veiculoProprio: true,
+      })
+    );
+  });
+
+  test('uma rota sem motorista mostra "A definir" na lista', async () => {
+    mockedApi.get.mockImplementation(async (url: string) => {
+      if (url === '/rotas') {
+        return { data: paginated([{ ...rota, motorista: null, veiculo: null, veiculoProprio: false }]) };
+      }
+      return { data: paginated([]) };
+    });
+
+    renderWithProviders(<Atribuicoes />);
+    expect(await screen.findAllByText('A definir')).not.toHaveLength(0);
   });
 });

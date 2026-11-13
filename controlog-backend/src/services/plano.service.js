@@ -186,7 +186,11 @@ export function createPlanoService(prisma) {
     // aprovados (Pedido.rotaId) e cria uma Entrega por pedido — a partir
     // daqui a rota aparece na página real de Rotas e entra nos agregados
     // de Dashboard/Relatórios, igual a qualquer rota cadastrada na mão.
-    async aprovarRota(planoId, rotaIndex, { motoristaId, veiculoId, dataHora }) {
+    async aprovarRota(
+      planoId,
+      rotaIndex,
+      { motoristaId = null, veiculoId = null, veiculoProprio = false, dataHora }
+    ) {
       const indice = Number(rotaIndex);
       if (!Number.isInteger(indice) || indice < 1) {
         throw new ValidationError('rotaIndex inválido.');
@@ -208,12 +212,23 @@ export function createPlanoService(prisma) {
         throw new ConflictError(`A Rota ${indice} deste plano já foi aprovada.`);
       }
 
+      // Excludentes: o banco também recusa (constraint rotas_veiculo_proprio_sem_frota),
+      // mas falhar aqui dá uma mensagem que diz o que fazer, em vez de um erro
+      // de constraint que vaza nome de tabela para a tela.
+      if (veiculoProprio && veiculoId) {
+        throw new ValidationError(
+          'Veículo próprio e veículo da frota são excludentes: escolha um dos dois.'
+        );
+      }
+
+      // Só valida o que foi informado. Aprovar sem motorista ou sem veículo é
+      // legítimo: a atribuição acontece depois, na tela de Atribuição de Rotas.
       const [motorista, veiculo] = await Promise.all([
-        prisma.motorista.findUnique({ where: { id: motoristaId } }),
-        prisma.veiculo.findUnique({ where: { id: veiculoId } }),
+        motoristaId ? prisma.motorista.findUnique({ where: { id: motoristaId } }) : null,
+        veiculoId ? prisma.veiculo.findUnique({ where: { id: veiculoId } }) : null,
       ]);
-      if (!motorista) throw new ValidationError('Motorista informado não existe.');
-      if (!veiculo) throw new ValidationError('Veículo informado não existe.');
+      if (motoristaId && !motorista) throw new ValidationError('Motorista informado não existe.');
+      if (veiculoId && !veiculo) throw new ValidationError('Veículo informado não existe.');
 
       const cidades = [...new Set(pedidosDoGrupo.map((p) => p.cidade))];
       const latDestino = pedidosDoGrupo.reduce((soma, p) => soma + p.lat, 0) / pedidosDoGrupo.length;
@@ -243,6 +258,7 @@ export function createPlanoService(prisma) {
               dataHora,
               motoristaId,
               veiculoId,
+              veiculoProprio,
             },
           });
 

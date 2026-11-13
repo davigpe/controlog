@@ -563,6 +563,119 @@ job fica vermelho com as últimas 40 linhas do log do build.
 > O `.env.production` continua só na instância. O workflow nunca o toca, e
 > nenhum segredo de produção passa pelo GitHub.
 
+## 10. E-mail transacional (Amazon SES)
+
+É por aqui que sai o link de "esqueci minha senha". Sem isto configurado, o
+transporte padrão é `registro`: o link vai para o log do servidor em vez de
+chegar ao usuário.
+
+### Por que SES, e sem chave de API
+
+A instância já tem instance profile (`controlog-ec2-ssm`, do passo 9). O SDK da
+AWS pega a credencial do metadata da instância, então **nenhuma chave de e-mail
+entra no `.env.production` nem no repositório** — mesmo princípio do OIDC no
+deploy. A permissão é concedida na role e restrita à identidade do domínio: a
+instância não consegue enviar por nenhuma outra identidade da conta.
+
+### Criar a identidade
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/email.yml \
+  --stack-name controlog-email \
+  --parameter-overrides Dominio=controlog.app \
+  --region us-east-1 --profile controlog
+```
+
+E atualizar a stack do passo 9, que ganhou a permissão de envio:
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/cicd.yml \
+  --stack-name controlog-cicd \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides InstanceId=i-0312046515c971063 DominioDeEmail=controlog.app \
+  --region us-east-1 --profile controlog
+```
+
+### Registros no DNS
+
+As saídas da stack `controlog-email` trazem o que cadastrar no Cloudflare:
+
+```bash
+aws cloudformation describe-stacks --stack-name controlog-email \
+  --region us-east-1 --profile controlog \
+  --query "Stacks[0].Outputs[].[OutputKey,OutputValue]" --output text
+```
+
+| Tipo | Nome | Conteúdo |
+|---|---|---|
+| CNAME ×3 | `NomeDkim1/2/3` | o `ValorDkim` correspondente |
+| MX | `envio.controlog.app` | `feedback-smtp.us-east-1.amazonses.com`, prioridade 10 |
+| TXT | `envio.controlog.app` | `v=spf1 include:amazonses.com ~all` |
+
+Todos como **DNS only** (nuvem cinza). O proxy da Cloudflare não se aplica a
+CNAME de verificação nem a MX, e deixá-lo ligado atrapalha a validação.
+
+Os três CNAMEs são o DKIM, que assina as mensagens. O MX e o TXT alinham o
+endereço de retorno ao seu domínio — sem eles o SES usa um domínio da Amazon,
+o SPF desalinha e a mensagem tende a cair em spam.
+
+> O `BehaviorOnMxFailure` está em `REJECT_MESSAGE`: se o MX não resolver, o
+> envio falha em vez de voltar silenciosamente ao domínio da Amazon. Uma falha
+> silenciosa aqui apareceria só como "o e-mail não chega para algumas pessoas".
+
+### Sair do sandbox
+
+Por padrão o SES só envia para endereços verificados. Para alcançar qualquer
+destinatário — o professor testando "esqueci minha senha" com o e-mail dele,
+por exemplo — é preciso pedir acesso de produção:
+
+Console → **Amazon SES** → *Account dashboard* → **Request production access**.
+
+Informe o caso de uso (redefinição de senha e notificações transacionais de um
+sistema de gestão logística), o volume esperado (baixo) e como lida com
+retornos. A aprovação costuma sair em até 24 horas. **Peça com antecedência da
+apresentação.**
+
+Enquanto o pedido não é aprovado, dá para testar verificando o seu próprio
+endereço:
+
+```bash
+aws sesv2 create-email-identity --email-identity voce@exemplo.com \
+  --region us-east-1 --profile controlog
+```
+
+### Ligar na aplicação
+
+No `.env.production` da instância:
+
+```bash
+EMAIL_TRANSPORTE="ses"
+EMAIL_REMETENTE="Controlog <nao-responda@controlog.app>"
+```
+
+E redeployar, para o contêiner reler o arquivo.
+
+### Conferir
+
+```bash
+# A identidade precisa estar verificada
+aws sesv2 get-email-identity --email-identity controlog.app \
+  --region us-east-1 --profile controlog \
+  --query "{verificada:VerifiedForSendingStatus,dkim:DkimAttributes.Status}"
+
+# Ainda no sandbox?
+aws sesv2 get-account --region us-east-1 --profile controlog \
+  --query "{producao:ProductionAccessEnabled,envioHabilitado:SendingEnabled}"
+```
+
+Depois, pela aplicação: peça a redefinição em https://controlog.app/esqueci-senha
+e confira a caixa de entrada. Falha de envio **não** aparece para o usuário —
+ela é registrada no log do contêiner da API, com o destinatário, porque
+responder diferente para e-mail cadastrado e não cadastrado permitiria
+descobrir quais endereços existem no sistema.
+
 ## Como conferir que subiu certo
 
 Depois do `up -d`, rodando na instância:
@@ -622,5 +735,8 @@ Honestidade sobre os limites deste deploy:
 - **Comprovantes de entrega sem backup automático.** Os arquivos ficam num
   volume do Docker na instância, fora do snapshot do RDS. O procedimento de
   cópia manual está em *Backup*, no passo 8.
+- **E-mail depende da saída do sandbox do SES.** Antes da aprovação, só chega
+  a destinatários verificados — ver passo 10. O envio em si já está pronto e
+  cai para registro em log se o transporte não estiver configurado.
 - **Uma instância só.** Sem redundância: se ela cair, o sistema cai. É
   adequado ao escopo do projeto e não deve ser vendido como outra coisa.

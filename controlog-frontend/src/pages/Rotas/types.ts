@@ -10,8 +10,12 @@ export interface Rota {
   criadoEm: string;
   coordenadasOrigem: [number, number];
   coordenadasDestino: [number, number];
-  motorista: { id: string; nome: string };
-  veiculo: { id: string; placa: string; modelo: string };
+  /** null quando a rota foi aprovada antes de se definir quem dirige. */
+  motorista: { id: string; nome: string } | null;
+  /** null tanto para "a definir" quanto para veículo próprio — ver veiculoProprio. */
+  veiculo: { id: string; placa: string; modelo: string } | null;
+  /** O motorista usa veículo que não é da frota. */
+  veiculoProprio: boolean;
   totalEntregas: number;
   entregasPendentes: number;
 }
@@ -20,8 +24,9 @@ export interface RotaInput {
   codigo: string;
   origem: string;
   destino: string;
-  motoristaId: string;
-  veiculoId: string;
+  motoristaId: string | null;
+  veiculoId: string | null;
+  veiculoProprio?: boolean;
   dataHora: string;
   status?: StatusRota;
   latOrigem: number;

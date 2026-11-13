@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { ConflictError, UnauthorizedError, ValidationError } from '../utils/AppError.js';
+import { createEmailService } from './email/index.js';
 
 const SALT_ROUNDS = 12;
 const RESET_TOKEN_BYTES = 32;
@@ -33,7 +34,7 @@ function signRefreshToken(usuario) {
   });
 }
 
-export function createAuthService(prisma) {
+export function createAuthService(prisma, { emailService = createEmailService() } = {}) {
   return {
     async register({ nome, email, senha }) {
       const existente = await prisma.usuario.findUnique({ where: { email } });
@@ -95,11 +96,10 @@ export function createAuthService(prisma) {
       return publicUser(usuario);
     },
 
-    // Não há provedor de e-mail configurado neste projeto (não é um domínio de
-    // produção com envio transacional) — o link de redefinição é registrado no
-    // log do servidor em vez de enviado por e-mail. Ver docs/DEPLOY.md.
     // Sempre retorna sucesso independente do e-mail existir, para não permitir
-    // enumeração de usuários cadastrados através deste endpoint público.
+    // enumeração de usuários cadastrados através deste endpoint público. Pela
+    // mesma razão, uma falha no envio não vira erro de resposta: ela é
+    // registrada no log do servidor e o cliente recebe o mesmo sucesso.
     async solicitarResetSenha(email) {
       const usuario = await prisma.usuario.findUnique({ where: { email } });
       if (!usuario) return;
@@ -114,7 +114,11 @@ export function createAuthService(prisma) {
       });
 
       const link = `${env.corsOrigin}/redefinir-senha?token=${token}`;
-      console.log(`[reset-senha] Link de redefinição para ${email}: ${link}`);
+      await emailService.enviarRedefinicaoDeSenha({
+        para: email,
+        link,
+        validadeMinutos: RESET_TOKEN_EXPIRA_MS / 60000,
+      });
     },
 
     async redefinirSenha({ token, novaSenha }) {

@@ -7,6 +7,7 @@ import Pagination from '@/components/shared/Pagination'
 import EntregaDetalhes from './EntregaDetalhes'
 import EntregaFormModal from './EntregaFormModal'
 import { useCreateEntrega, useDeleteEntrega, useEntregas, useUpdateEntrega } from './api'
+import { nomeDoMotorista } from '@/pages/Rotas/apresentacao'
 import type { Entrega, EntregaInput, StatusEntrega } from './types'
 
 const statusOptions: StatusEntrega[] = [
@@ -176,7 +177,9 @@ export default function Entregas() {
                     <td className="px-6 py-4 font-medium text-gray-700">{entrega.codigo}</td>
                     <td className="px-6 py-4 text-gray-600">{entrega.rota.codigo}</td>
                     <td className="px-6 py-4 text-gray-600">{entrega.destino}</td>
-                    <td className="px-6 py-4 text-gray-600">{entrega.motorista.nome}</td>
+                    <td className={`px-6 py-4 ${entrega.motorista ? 'text-gray-600' : 'text-gray-500 italic'}`}>
+                      {nomeDoMotorista(entrega.motorista)}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">
                       {new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')}
                     </td>

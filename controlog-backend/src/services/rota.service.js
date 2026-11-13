@@ -23,8 +23,13 @@ function toResponse(rota) {
     criadoEm: rota.criadoEm,
     coordenadasOrigem: [rota.latOrigem, rota.lngOrigem],
     coordenadasDestino: [rota.latDestino, rota.lngDestino],
-    motorista: rota.motorista,
-    veiculo: rota.veiculo,
+    // Ambos podem ser null: a rota pode ter sido aprovada antes de se definir
+    // quem dirige e em que veículo.
+    motorista: rota.motorista ?? null,
+    veiculo: rota.veiculo ?? null,
+    // Com veiculoProprio, `veiculo` é null por invariante — é a marcação que
+    // diz à tela mostrar "Veículo próprio" em vez de "a definir".
+    veiculoProprio: rota.veiculoProprio ?? false,
     totalEntregas: entregas.length,
     entregasPendentes: entregas.filter((e) => PENDENTES.has(e.status)).length,
   };
@@ -114,11 +119,30 @@ export function createRotaService(prisma) {
         if (!veiculo) throw new ValidationError('Veículo informado não existe.');
       }
 
+      // Combinação impossível depois de aplicar a atualização sobre o estado
+      // atual: mandar só `veiculoId` numa rota marcada como veículo próprio
+      // passaria pelo validador (que vê um campo só) e bateria na constraint
+      // do banco, com mensagem técnica na tela.
+      const veiculoProprioFinal = data.veiculoProprio ?? existente.veiculoProprio;
+      const veiculoIdFinal = Object.prototype.hasOwnProperty.call(data, 'veiculoId')
+        ? data.veiculoId
+        : existente.veiculoId;
+      if (veiculoProprioFinal && veiculoIdFinal) {
+        throw new ValidationError(
+          'Veículo próprio e veículo da frota são excludentes: escolha um dos dois.'
+        );
+      }
+
       // Reatribuir a rota a outro motorista tem que levar as entregas junto:
       // Entrega.motoristaId é independente do da Rota, e se ficasse pra trás o
       // motorista antigo continuaria vendo essas entregas como dele (e os
       // agregados de "entregas realizadas" contariam pra pessoa errada).
-      const trocouMotorista = data.motoristaId && data.motoristaId !== existente.motoristaId;
+      // hasOwnProperty, e não um teste de verdade: `motoristaId: null` é um
+      // pedido legítimo (desatribuir a rota) e seria descartado por um `&&`,
+      // deixando as entregas com o motorista anterior — que continuaria a
+      // vê-las como suas em "Minhas Rotas".
+      const motoristaInformado = Object.prototype.hasOwnProperty.call(data, 'motoristaId');
+      const trocouMotorista = motoristaInformado && data.motoristaId !== existente.motoristaId;
 
       const rota = await prisma.$transaction(async (tx) => {
         const atualizada = await tx.rota.update({ where: { id }, data, include });

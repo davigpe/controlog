@@ -148,11 +148,25 @@ model Rota {
   dataHora   DateTime   @map("data_hora")
   criadoEm   DateTime   @default(now()) @map("criado_em")
 
-  motoristaId String    @map("motorista_id")
-  motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+  // Opcional: uma rota pode ser aprovada antes de se saber quem vai dirigir,
+  // e a atribuicao acontece depois (tela de Atribuicao de Rotas). Antes disso
+  // era obrigatorio, o que forcava escolher um motorista so para destravar a
+  // aprovacao — e trocar depois, sem registro de que a escolha foi provisoria.
+  motoristaId String?    @map("motorista_id")
+  motorista   Motorista? @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
 
-  veiculoId String  @map("veiculo_id")
-  veiculo   Veiculo @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+  // Null tem dois significados possiveis, desambiguados por veiculoProprio:
+  // com a marcacao falsa, o veiculo ainda nao foi definido; com ela
+  // verdadeira, a rota sai em veiculo que nao e da frota.
+  veiculoId String?  @map("veiculo_id")
+  veiculo   Veiculo? @relation(fields: [veiculoId], references: [id], onDelete: Restrict)
+
+  // O motorista usa veiculo proprio. Sem placa nem descricao de proposito: o
+  // que a operacao precisa saber e que aquele trajeto nao consumiu a frota, e
+  // nao qual carro era. Um veiculo "PROPRIO" cadastrado na frota resolveria
+  // sem campo novo, mas poluiria a listagem, a contagem de disponiveis e os
+  // relatorios com uma linha que nao e um veiculo.
+  veiculoProprio Boolean @default(false) @map("veiculo_proprio")
 
   entregas Entrega[]
   pedidos  Pedido[]
@@ -178,8 +192,10 @@ model Entrega {
   rotaId String @map("rota_id")
   rota   Rota   @relation(fields: [rotaId], references: [id], onDelete: Restrict)
 
-  motoristaId String    @map("motorista_id")
-  motorista   Motorista @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
+  // Acompanha a rota: aprovada sem motorista, as entregas dela tambem nascem
+  // sem dono, e todas passam a ter um quando a rota e atribuida.
+  motoristaId String?    @map("motorista_id")
+  motorista   Motorista? @relation(fields: [motoristaId], references: [id], onDelete: Restrict)
 
   comprovantes ComprovanteEntrega[]
 

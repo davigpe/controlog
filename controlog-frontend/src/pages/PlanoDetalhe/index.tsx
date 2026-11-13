@@ -326,7 +326,12 @@ export default function PlanoDetalhe() {
     });
   }
 
-  function handleAprovarRota(dados: { motoristaId: string; veiculoId: string; dataHora: string }) {
+  function handleAprovarRota(dados: {
+    motoristaId: string | null
+    veiculoId: string | null
+    veiculoProprio: boolean
+    dataHora: string
+  }) {
     if (aprovando === null) return;
     aprovarRotaMutation.mutate(
       { rotaIndex: aprovando, ...dados },

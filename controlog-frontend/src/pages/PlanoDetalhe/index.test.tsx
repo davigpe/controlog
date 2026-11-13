@@ -516,3 +516,82 @@ describe('PlanoDetalhe', () => {
     expect(screen.getByRole('button', { name: /Otimizar Plano/ })).toBeDisabled();
   });
 });
+
+describe('PlanoDetalhe — aprovar sem motorista e com veículo próprio', () => {
+  function planoPronto() {
+    return {
+      ...planoAberto(),
+      status: 'OTIMIZADO' as const,
+      pedidos: [pedido('p1', 'PED-001', 1)],
+    };
+  }
+
+  function soOPlano() {
+    mockedApi.get.mockImplementation((url: string) => {
+      if (url === '/planos/plano1') return Promise.resolve({ data: planoPronto() });
+      return Promise.resolve({
+        data: { items: [], pagination: { page: 1, pageSize: 100, total: 0, totalPages: 0 } },
+      });
+    });
+  }
+
+  // O caso que motivou a mudança: aprovar a rota antes de saber quem dirige.
+  test('aprova com motorista e veículo em "A definir" e envia null nos dois', async () => {
+    const user = userEvent.setup();
+    soOPlano();
+    mockedApi.post.mockResolvedValue({ data: { id: 'r1', codigo: 'RT-010' } });
+    renderPlano();
+    await screen.findByText('Rota 1');
+
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+    await screen.findByRole('dialog', { name: 'Aprovar Rota 1' });
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+
+    await waitFor(() =>
+      expect(mockedApi.post).toHaveBeenCalledWith(
+        '/planos/plano1/rotas/1/aprovar',
+        expect.objectContaining({
+          motoristaId: null,
+          veiculoId: null,
+          veiculoProprio: false,
+        })
+      )
+    );
+  });
+
+  test('o modal explica que dá para definir o resto depois', async () => {
+    const user = userEvent.setup();
+    soOPlano();
+    renderPlano();
+    await screen.findByText('Rota 1');
+
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+    await screen.findByRole('dialog', { name: 'Aprovar Rota 1' });
+
+    expect(
+      screen.getByText(/pode aprovar agora e definir o restante depois/i)
+    ).toBeInTheDocument();
+  });
+
+  test('escolher "Veículo próprio" envia a marcação com veiculoId nulo', async () => {
+    const user = userEvent.setup();
+    soOPlano();
+    mockedApi.post.mockResolvedValue({ data: { id: 'r1', codigo: 'RT-010' } });
+    renderPlano();
+    await screen.findByText('Rota 1');
+
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+    await screen.findByRole('dialog', { name: 'Aprovar Rota 1' });
+
+    await user.click(screen.getByLabelText('Veículo'));
+    await user.click(await screen.findByRole('option', { name: 'Veículo próprio' }));
+    await user.click(screen.getByRole('button', { name: 'Aprovar Rota' }));
+
+    await waitFor(() =>
+      expect(mockedApi.post).toHaveBeenCalledWith(
+        '/planos/plano1/rotas/1/aprovar',
+        expect.objectContaining({ veiculoProprio: true, veiculoId: null })
+      )
+    );
+  });
+});

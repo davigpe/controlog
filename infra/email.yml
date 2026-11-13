@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+# Identidade de e-mail do Controlog no Amazon SES.
+#
+# Fica numa stack separada da de CI/CD de proposito: sao ciclos de vida
+# diferentes. A identidade de e-mail depende do dominio e do DNS; as roles de
+# deploy dependem do repositorio e da instancia. Juntar as duas faria uma
+# mudanca de DNS arriscar a esteira de deploy.
+#
+# Para criar ou atualizar:
+#   aws cloudformation deploy --template-file infra/email.yml \
+#     --stack-name controlog-email --region us-east-1 --profile controlog
+#
+# Depois de criada, as saidas trazem os tres registros CNAME de DKIM que
+# precisam ser cadastrados no DNS (Cloudflare). Ate eles propagarem, o SES
+# mantem a identidade como "pendente" e recusa o envio.
+
+Description: Identidade de dominio no SES para o envio transacional do Controlog
+
+Parameters:
+  Dominio:
+    Type: String
+    Default: controlog.app
+    Description: Dominio verificado para enviar e-mail
+
+  SubdominioDeRetorno:
+    Type: String
+    Default: envio
+    Description: >-
+      Subdominio usado no MAIL FROM. Sem ele, o endereco de retorno fica num
+      dominio da Amazon, o que desalinha o SPF e piora a entregabilidade.
+
+Resources:
+  IdentidadeDoDominio:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref Dominio
+      DkimAttributes:
+        SigningEnabled: true
+      DkimSigningAttributes:
+        # Easy DKIM com chave de 2048 bits. A Amazon gera e rotaciona as
+        # chaves; o DNS so aponta para elas pelos CNAMEs das saidas.
+        NextSigningKeyLength: RSA_2048_BIT
+      MailFromAttributes:
+        MailFromDomain: !Sub '${SubdominioDeRetorno}.${Dominio}'
+        # Recusar o envio quando o MAIL FROM nao resolve, em vez de cair no
+        # dominio da Amazon em silencio: o alinhamento de SPF e o que mantem a
+        # mensagem fora da caixa de spam, e uma falha silenciosa aqui so
+        # apareceria como "o e-mail nao chega para alguns".
+        BehaviorOnMxFailure: REJECT_MESSAGE
+
+Outputs:
+  NomeDkim1:
+    Description: CNAME 1 de DKIM - nome
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenName1
+  ValorDkim1:
+    Description: CNAME 1 de DKIM - destino
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenValue1
+  NomeDkim2:
+    Description: CNAME 2 de DKIM - nome
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenName2
+  ValorDkim2:
+    Description: CNAME 2 de DKIM - destino
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenValue2
+  NomeDkim3:
+    Description: CNAME 3 de DKIM - nome
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenName3
+  ValorDkim3:
+    Description: CNAME 3 de DKIM - destino
+    Value: !GetAtt IdentidadeDoDominio.DkimDNSTokenValue3
+
+  RegistroMxDeRetorno:
+    Description: MX do subdominio de retorno (prioridade 10)
+    Value: !Sub 'feedback-smtp.${AWS::Region}.amazonses.com'
+  NomeDoSubdominioDeRetorno:
+    Description: Nome do registro MX e do TXT de SPF
+    Value: !Sub '${SubdominioDeRetorno}.${Dominio}'
+  SpfDeRetorno:
+    Description: Conteudo do TXT de SPF no subdominio de retorno
+    Value: !Sub '"v=spf1 include:amazonses.com ~all"'

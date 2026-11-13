@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { descricaoDoVeiculo, nomeDoMotorista } from './apresentacao'
 import type { Rota } from './types';
 import RotaMapa from './RotaMapa';
 
@@ -44,11 +45,15 @@ export default function RotaDetalhes({ rota, open, onClose }: Props) {
             </div>
             <div>
               <span className="text-muted-foreground">Motorista</span>
-              <p className="font-medium">{rota.motorista.nome}</p>
+              <p className={rota.motorista ? 'font-medium' : 'font-medium text-muted-foreground italic'}>
+                {nomeDoMotorista(rota.motorista)}
+              </p>
             </div>
             <div>
               <span className="text-muted-foreground">Veículo</span>
-              <p className="font-medium">{rota.veiculo.modelo} — {rota.veiculo.placa}</p>
+              <p className={rota.veiculo ? 'font-medium' : 'font-medium text-muted-foreground italic'}>
+                {descricaoDoVeiculo(rota)}
+              </p>
             </div>
             <div>
               <span className="text-muted-foreground">Status</span>

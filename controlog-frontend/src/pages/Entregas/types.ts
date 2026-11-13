@@ -23,13 +23,14 @@ export interface Entrega {
   observacao?: string | null
   criadoEm: string
   rota: { id: string; codigo: string }
-  motorista: { id: string; nome: string }
+  /** null enquanto a rota da entrega não tiver motorista atribuído. */
+  motorista: { id: string; nome: string } | null
 }
 
 export interface EntregaInput {
   codigo: string
   rotaId: string
-  motoristaId: string
+  motoristaId: string | null
   destino: string
   status?: StatusEntrega
   dataPrevista: string

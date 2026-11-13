@@ -43,6 +43,11 @@ Parameters:
     Type: AWS::EC2::Instance::Id
     Description: Instancia EC2 que recebe o deploy
 
+  DominioDeEmail:
+    Type: String
+    Default: controlog.app
+    Description: Dominio verificado no SES, do qual a instancia pode enviar
+
 Resources:
   # A lista de thumbprints existe por compatibilidade: a AWS valida este
   # provider pelas CAs publicas e ignora o valor. O campo segue aqui porque
@@ -105,7 +110,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: controlog-ec2-ssm
-      Description: Permite que a EC2 do Controlog seja gerenciada pelo Systems Manager
+      Description: Permite que a EC2 do Controlog seja gerenciada pelo SSM e envie e-mail pelo SES
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -115,6 +120,22 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Policies:
+        # E daqui que a aplicacao tira permissao para enviar e-mail. Pelo
+        # instance profile, e nao por chave de API no .env.production: o SDK
+        # pega a credencial do metadata da instancia, entao nao ha segredo de
+        # e-mail em lugar nenhum do repositorio nem do servidor.
+        - PolicyName: enviar-email-transacional
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EnviarPelaIdentidadeDoControlog
+                Effect: Allow
+                Action: ses:SendEmail
+                # Restrito a identidade do dominio: a instancia nao consegue
+                # enviar usando nenhuma outra identidade verificada que venha a
+                # existir nesta conta.
+                Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${DominioDeEmail}'
 
   PerfilSsmDaInstancia:
     Type: AWS::IAM::InstanceProfile

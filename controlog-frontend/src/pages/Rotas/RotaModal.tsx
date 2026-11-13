@@ -8,6 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMotoristas } from '@/pages/Motoristas/api';
+import {
+  motoristaParaPayload,
+  SEM_DEFINICAO,
+  VALOR_A_DEFINIR,
+  VALOR_VEICULO_PROPRIO,
+  veiculoParaPayload,
+  VEICULO_PROPRIO,
+} from './apresentacao'
 import { useVeiculos } from '@/pages/Veiculos/api';
 import type { Rota, StatusRota } from './types';
 
@@ -15,8 +23,10 @@ const schema = z.object({
   codigo: z.string().trim().min(3, 'Código deve ter ao menos 3 caracteres.'),
   origem: z.string().trim().min(2, 'Informe a origem.'),
   destino: z.string().trim().min(2, 'Informe o destino.'),
-  motoristaId: z.string().uuid('Selecione um motorista.'),
-  veiculoId: z.string().uuid('Selecione um veículo.'),
+  // nullable: a rota pode existir sem motorista e sem veículo definidos.
+  motoristaId: z.string().uuid('Selecione um motorista.').nullable(),
+  veiculoId: z.string().uuid('Selecione um veículo.').nullable(),
+  veiculoProprio: z.boolean(),
   dataHora: z.string().min(1, 'Informe a data/hora.'),
   status: z.enum(['ATIVA', 'CONCLUIDA', 'CANCELADA']),
   latOrigem: z.number(),
@@ -51,8 +61,9 @@ export default function RotaModal({ open, onClose, onSave, rotaEditando, saving 
         codigo: rotaEditando.codigo,
         origem: rotaEditando.origem,
         destino: rotaEditando.destino,
-        motoristaId: rotaEditando.motorista.id,
-        veiculoId: rotaEditando.veiculo.id,
+        motoristaId: rotaEditando.motorista?.id ?? null,
+        veiculoId: rotaEditando.veiculo?.id ?? null,
+        veiculoProprio: rotaEditando.veiculoProprio,
         status: rotaEditando.status,
         dataHora: rotaEditando.dataHora.slice(0, 16),
         latOrigem: rotaEditando.coordenadasOrigem[0],
@@ -118,13 +129,15 @@ export default function RotaModal({ open, onClose, onSave, rotaEditando, saving 
             <div className="space-y-1">
               <Label htmlFor="rota-motorista">Motorista</Label>
               <Select
-                value={watch('motoristaId')}
-                onValueChange={(v) => setValue('motoristaId', v)}
+                // O Select nao aceita null; o sentinela representa "a definir".
+                value={watch('motoristaId') ?? VALOR_A_DEFINIR}
+                onValueChange={(v) => setValue('motoristaId', motoristaParaPayload(v))}
               >
                 <SelectTrigger id="rota-motorista" className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={VALOR_A_DEFINIR}>{SEM_DEFINICAO}</SelectItem>
                   {motoristas.map((m) => (
                     <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
                   ))}
@@ -135,13 +148,25 @@ export default function RotaModal({ open, onClose, onSave, rotaEditando, saving 
             <div className="space-y-1">
               <Label htmlFor="rota-veiculo">Veículo</Label>
               <Select
-                value={watch('veiculoId')}
-                onValueChange={(v) => setValue('veiculoId', v)}
+                value={
+                  watch('veiculoProprio')
+                    ? VALOR_VEICULO_PROPRIO
+                    : (watch('veiculoId') ?? VALOR_A_DEFINIR)
+                }
+                onValueChange={(v) => {
+                  const { veiculoId, veiculoProprio } = veiculoParaPayload(v)
+                  // Os dois juntos de uma vez: setar só um deixaria o
+                  // formulario num estado que a API recusa.
+                  setValue('veiculoId', veiculoId)
+                  setValue('veiculoProprio', veiculoProprio)
+                }}
               >
                 <SelectTrigger id="rota-veiculo" className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={VALOR_A_DEFINIR}>{SEM_DEFINICAO}</SelectItem>
+                  <SelectItem value={VALOR_VEICULO_PROPRIO}>{VEICULO_PROPRIO}</SelectItem>
                   {veiculos.map((v) => (
                     <SelectItem key={v.id} value={v.id}>{v.modelo} — {v.placa}</SelectItem>
                   ))}
