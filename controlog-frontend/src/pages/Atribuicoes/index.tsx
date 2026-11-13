@@ -5,6 +5,7 @@ import { getErrorMessage } from '@/lib/api'
 import Pagination from '@/components/shared/Pagination'
 import { useRotas, useUpdateRota } from '@/pages/Rotas/api'
 import { useMotoristas } from '@/pages/Motoristas/api'
+import { nomeDoMotorista, placaDoVeiculo } from '@/pages/Rotas/apresentacao'
 import type { Rota, StatusRota } from '@/pages/Rotas/types'
 import AtribuirModal from './AtribuirModal'
 
@@ -59,7 +60,11 @@ export default function Atribuicoes() {
     setPage(1)
   }
 
-  function handleAtribuir(dados: { motoristaId: string; veiculoId: string }) {
+  function handleAtribuir(dados: {
+    motoristaId: string | null
+    veiculoId: string | null
+    veiculoProprio: boolean
+  }) {
     if (!atribuindo) return
     const codigo = atribuindo.codigo
     updateMutation
@@ -181,11 +186,15 @@ export default function Atribuicoes() {
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span className="flex items-center gap-1.5 text-gray-700">
                       <Users size={14} className="text-blue-500" />
-                      {rota.motorista.nome}
+                      <span className={rota.motorista ? undefined : 'text-gray-500 italic'}>
+                        {nomeDoMotorista(rota.motorista)}
+                      </span>
                     </span>
                     <span className="flex items-center gap-1.5 text-xs text-gray-600 mt-0.5">
                       <Truck size={13} className="text-blue-500" />
-                      {rota.veiculo.placa}
+                      <span className={rota.veiculo ? undefined : 'text-gray-500 italic'}>
+                        {placaDoVeiculo(rota)}
+                      </span>
                     </span>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">

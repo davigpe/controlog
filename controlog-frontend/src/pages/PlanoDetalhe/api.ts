@@ -4,8 +4,12 @@ import type { PlanoDetalhe } from './types';
 
 interface AprovarRotaInput {
   rotaIndex: number;
-  motoristaId: string;
-  veiculoId: string;
+  /** null aprova a rota sem motorista: a atribuição acontece depois. */
+  motoristaId: string | null;
+  /** null com veiculoProprio falso significa "a definir". */
+  veiculoId: string | null;
+  /** O motorista usa veículo que não é da frota. Excludente com veiculoId. */
+  veiculoProprio: boolean;
   dataHora: string;
 }
 
@@ -57,11 +61,18 @@ export function useMoverPedidos(planoId: string) {
 export function useAprovarRota(planoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ rotaIndex, motoristaId, veiculoId, dataHora }: AprovarRotaInput) =>
+    mutationFn: async ({
+      rotaIndex,
+      motoristaId,
+      veiculoId,
+      veiculoProprio,
+      dataHora,
+    }: AprovarRotaInput) =>
       (
         await api.post<RotaAprovada>(`/planos/${planoId}/rotas/${rotaIndex}/aprovar`, {
           motoristaId,
           veiculoId,
+          veiculoProprio,
           dataHora,
         })
       ).data,

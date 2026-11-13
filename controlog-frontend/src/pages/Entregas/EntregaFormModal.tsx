@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMotoristas } from '@/pages/Motoristas/api';
 import { useRotas } from '@/pages/Rotas/api';
+import { motoristaParaPayload, SEM_DEFINICAO, VALOR_A_DEFINIR } from '@/pages/Rotas/apresentacao'
 import type { Entrega, StatusEntrega } from './types';
 
 interface FormData {
   codigo: string;
   rotaId: string;
-  motoristaId: string;
+  /** null quando a entrega ainda nao tem motorista definido. */
+  motoristaId: string | null;
   destino: string;
   status: StatusEntrega;
   dataPrevista: string;
@@ -39,14 +41,14 @@ export default function EntregaFormModal({ open, entregaEditando, onClose, onSav
       reset({
         codigo: entregaEditando.codigo,
         rotaId: entregaEditando.rota.id,
-        motoristaId: entregaEditando.motorista.id,
+        motoristaId: entregaEditando.motorista?.id ?? null,
         destino: entregaEditando.destino,
         status: entregaEditando.status,
         dataPrevista: entregaEditando.dataPrevista.slice(0, 10),
       });
     } else {
       reset({
-        codigo: '', rotaId: '', motoristaId: '', destino: '',
+        codigo: '', rotaId: '', motoristaId: null, destino: '',
         status: 'PENDENTE', dataPrevista: new Date().toISOString().slice(0, 10),
       });
     }
@@ -93,11 +95,15 @@ export default function EntregaFormModal({ open, entregaEditando, onClose, onSav
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="entrega-motorista">Motorista</Label>
-              <Select value={watch('motoristaId')} onValueChange={(v) => setValue('motoristaId', v)}>
+              <Select
+                value={watch('motoristaId') ?? VALOR_A_DEFINIR}
+                onValueChange={(v) => setValue('motoristaId', motoristaParaPayload(v))}
+              >
                 <SelectTrigger id="entrega-motorista" className="w-full">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={VALOR_A_DEFINIR}>{SEM_DEFINICAO}</SelectItem>
                   {motoristas.map((m) => (
                     <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
                   ))}

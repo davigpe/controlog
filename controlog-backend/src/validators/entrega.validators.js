@@ -4,7 +4,9 @@ import { z } from 'zod';
 export const createEntregaSchema = z.object({
   codigo: z.string().trim().min(3, 'Código deve ter ao menos 3 caracteres.'),
   rotaId: z.string().uuid('rotaId inválido.'),
-  motoristaId: z.string().uuid('motoristaId inválido.'),
+  // Opcional: a entrega acompanha a rota, e uma rota sem motorista gera
+  // entregas sem dono até a atribuição acontecer.
+  motoristaId: z.string().uuid('motoristaId inválido.').nullish(),
   destino: z.string().trim().min(2, 'Destino é obrigatório.'),
   status: z.enum(['PENDENTE', 'EM_TRANSITO', 'ENTREGUE', 'CANCELADA']).optional(),
   dataPrevista: z.coerce.date({ errorMap: () => ({ message: 'Data prevista inválida.' }) }),

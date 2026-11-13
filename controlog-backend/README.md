@@ -186,8 +186,9 @@ aceitam `?emRota=true|false` para filtrar por quem tem rota `ATIVA` vinculada no
 | RN03 — não excluir motorista com rota ativa vinculada | `src/services/motorista.service.js` (`remove`) |
 | RN04 — não excluir veículo com rota ativa vinculada | `src/services/veiculo.service.js` (`remove`) |
 | RN05 — código da rota é único | `src/services/rota.service.js` (`create`/`update`) + `@unique` no schema |
-| RN06 — rota exige origem, destino, motorista e veículo | `src/validators/rota.validators.js` (campos obrigatórios) |
-| RN07 — entrega exige rota e motorista vinculados | `src/validators/entrega.validators.js` + `src/services/entrega.service.js` |
+| RN06 (revisada) — rota exige origem, destino e data/hora; motorista e veículo são opcionais | `src/validators/rota.validators.js` |
+| RN07 (revisada) — entrega exige rota vinculada; o motorista acompanha o da rota e pode estar indefinido | `src/validators/entrega.validators.js` + `src/services/entrega.service.js` |
+| RN09 — veículo próprio e veículo da frota são excludentes na mesma rota | `src/services/rota.service.js` + constraint `rotas_veiculo_proprio_sem_frota` |
 | RN08 — não excluir rota com entregas pendentes | `src/services/rota.service.js` (`remove`) |
 
 ## Como o front-end consome esta API

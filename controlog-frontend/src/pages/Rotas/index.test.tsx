@@ -25,6 +25,7 @@ const rotaAtiva: Rota = {
   coordenadasDestino: [-27.5954, -48.548],
   motorista: { id: '11111111-1111-4111-8111-111111111111', nome: 'Carlos Silva' },
   veiculo: { id: '22222222-2222-4222-8222-222222222222', placa: 'ABC-1234', modelo: 'Mercedes Sprinter' },
+  veiculoProprio: false,
   totalEntregas: 0,
   entregasPendentes: 0,
 };
