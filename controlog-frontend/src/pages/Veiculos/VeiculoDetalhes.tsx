@@ -32,7 +32,7 @@ export default function VeiculoDetalhes({ veiculo, onClose }: Props) {
             {status}
           </span>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-xs text-gray-600 font-medium mb-0.5">Placa</p>
               <p className="font-mono text-gray-700">{veiculo.placa}</p>

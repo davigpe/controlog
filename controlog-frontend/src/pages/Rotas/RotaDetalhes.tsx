@@ -33,7 +33,7 @@ export default function RotaDetalhes({ rota, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Origem</span>
               <p className="font-medium">{rota.origem}</p>

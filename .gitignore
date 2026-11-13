@@ -16,3 +16,7 @@ node_modules/
 # dai a unica correcao seria trocar o key pair na AWS.
 *.pem
 *.ppk
+
+# Comprovantes de entrega gravados em disco. Em producao isto e um volume do
+# Docker; em desenvolvimento e uma pasta local que nao deve ir para o Git.
+uploads/

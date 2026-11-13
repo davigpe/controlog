@@ -39,7 +39,7 @@ export default function EntregaDetalhes({ entrega, onClose }: Props) {
             {statusLabel[entrega.status]}
           </span>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoRow icon={<Route size={15} />}    label="Rota"          value={entrega.rota.codigo} />
             <InfoRow icon={<User size={15} />}     label="Motorista"     value={entrega.motorista.nome} />
             <InfoRow icon={<Calendar size={15} />} label="Prev. Entrega" value={new Date(entrega.dataPrevista).toLocaleDateString('pt-BR')} />

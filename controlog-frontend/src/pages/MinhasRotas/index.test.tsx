@@ -41,6 +41,17 @@ const resposta: MinhasRotasResposta = {
           dataEfetiva: null,
           motivoInsucesso: null,
           observacao: null,
+          // Com comprovante: os testes de conclusao abaixo existem para medir a
+          // conclusao, e sem isto passariam a medir a regra nova de anexo.
+          comprovantes: [
+            {
+              id: 'c1',
+              nomeOriginal: 'canhoto.jpg',
+              mimeType: 'image/jpeg',
+              tamanho: 1024,
+              criadoEm: '2026-10-14T09:00:00.000Z',
+            },
+          ],
         },
         {
           id: 'e2',
@@ -51,6 +62,7 @@ const resposta: MinhasRotasResposta = {
           dataEfetiva: '2026-10-14T10:30:00.000Z',
           motivoInsucesso: null,
           observacao: null,
+          comprovantes: [],
         },
       ],
     },
@@ -236,5 +248,67 @@ describe('MinhasRotas', () => {
     expect(
       screen.getByRole('button', { name: 'Marcar entrega EN-001 como concluída' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('comprovante obrigatório para concluir', () => {
+  // A entrega e1 da fixture tem comprovante. Aqui a resposta é remontada sem
+  // nenhum, que é o estado em que o motorista acabou de chegar no endereço.
+  function semComprovantes(): MinhasRotasResposta {
+    return {
+      ...resposta,
+      rotas: [
+        {
+          ...resposta.rotas[0],
+          entregas: [{ ...resposta.rotas[0].entregas[0], comprovantes: [] }],
+        },
+      ],
+    };
+  }
+
+  test('o botão Concluir fica desabilitado enquanto não há comprovante', async () => {
+    mockedApi.get.mockResolvedValue({ data: semComprovantes() });
+    renderWithProviders(<MinhasRotas />);
+
+    const botao = await screen.findByRole('button', {
+      name: /marcar entrega EN-001 como concluída/i,
+    });
+    expect(botao).toBeDisabled();
+  });
+
+  test('a tela diz por que o botão está bloqueado', async () => {
+    mockedApi.get.mockResolvedValue({ data: semComprovantes() });
+    renderWithProviders(<MinhasRotas />);
+
+    expect(
+      await screen.findByText(/anexe a foto do comprovante para liberar a conclusão/i)
+    ).toBeInTheDocument();
+  });
+
+  test('com comprovante anexado, o botão volta a funcionar', async () => {
+    mockedApi.get.mockResolvedValue({ data: resposta });
+    renderWithProviders(<MinhasRotas />);
+
+    const botao = await screen.findByRole('button', {
+      name: /marcar entrega EN-001 como concluída/i,
+    });
+    expect(botao).toBeEnabled();
+  });
+
+  test('oferece anexar comprovante numa entrega pendente', async () => {
+    mockedApi.get.mockResolvedValue({ data: semComprovantes() });
+    renderWithProviders(<MinhasRotas />);
+
+    expect(await screen.findByRole('button', { name: /anexar comprovante/i })).toBeInTheDocument();
+  });
+
+  test('a entrega já concluída não oferece anexar nem remover', async () => {
+    mockedApi.get.mockResolvedValue({ data: resposta });
+    renderWithProviders(<MinhasRotas />);
+
+    await screen.findByText('EN-002');
+    // Há uma única entrega aberta (EN-001); a concluída (EN-002) não pode mais
+    // receber anexo, então o botão não se multiplica.
+    expect(screen.getAllByRole('button', { name: /anexar comprovante/i })).toHaveLength(1);
   });
 });

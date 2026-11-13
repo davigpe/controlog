@@ -45,7 +45,7 @@ export default function Planos() {
 
   return (
     <div className="space-y-5 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Planos</h1>
           <p className="text-sm text-gray-600">{data?.pagination.total ?? 0} planos encontrados</p>

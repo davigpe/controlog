@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { TAMANHO_MAXIMO_BYTES } from '../config/comprovantes.js';
 import { AppError } from '../utils/AppError.js';
 
 function sendError(res, req, status, body) {
@@ -24,6 +25,22 @@ export function errorHandler(err, req, res, next) {
       error: 'PayloadTooLargeError',
       message:
         'O conteúdo enviado é grande demais. Divida a planilha em lotes menores e tente de novo.',
+    });
+  }
+
+  // O multer tem erros próprios, que não herdam de AppError. O mais provável
+  // na prática é o motorista mandar a foto original do celular quando a
+  // redução no navegador falhou — e "Erro interno no servidor" não diria a
+  // ele o que fazer.
+  if (err?.name === 'MulterError') {
+    const mensagens = {
+      LIMIT_FILE_SIZE: `O arquivo é grande demais (limite de ${Math.round(TAMANHO_MAXIMO_BYTES / 1024 / 1024)} MB). Tire a foto com qualidade menor ou envie um arquivo mais leve.`,
+      LIMIT_FILE_COUNT: 'Envie um arquivo por vez.',
+      LIMIT_UNEXPECTED_FILE: 'Campo de arquivo inesperado. O comprovante deve vir no campo "arquivo".',
+    };
+    return sendError(res, req, err.code === 'LIMIT_FILE_SIZE' ? 413 : 422, {
+      error: 'ValidationError',
+      message: mensagens[err.code] ?? 'Não foi possível receber o arquivo enviado.',
     });
   }
 

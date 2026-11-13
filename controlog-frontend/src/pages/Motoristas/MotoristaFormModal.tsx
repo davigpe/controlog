@@ -66,7 +66,7 @@ export default function MotoristaFormModal({ open, motoristaEditando, onClose, o
             {errors.nome && <p className="text-xs text-red-600">{errors.nome.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="motorista-cnh">CNH</Label>
               <Input id="motorista-cnh" {...register('cnh')} placeholder="00000000000" />

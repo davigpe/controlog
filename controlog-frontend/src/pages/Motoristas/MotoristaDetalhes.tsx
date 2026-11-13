@@ -31,7 +31,7 @@ export default function MotoristaDetalhes({ motorista, onClose }: Props) {
             {status}
           </span>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InfoRow icon={<Phone size={15} />} label="Telefone" value={motorista.telefone} />
             <InfoRow icon={<CreditCard size={15} />} label="CNH" value={motorista.cnh} />
             <InfoRow icon={<Package size={15} />} label="Entregas concluídas" value={String(motorista.entregasRealizadas)} />

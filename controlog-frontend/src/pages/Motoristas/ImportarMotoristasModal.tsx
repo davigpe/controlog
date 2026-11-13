@@ -170,7 +170,11 @@ export default function ImportarMotoristasModal({ open, onClose, onImportar, sav
                 {linhas.length} {linhas.length === 1 ? 'motorista lido' : 'motoristas lidos'} de{' '}
                 {nomeArquivo}
               </div>
-              <table className="w-full text-sm">
+              {/* A previa tem nome, CNH e telefone: nao cabem lado a lado num
+                  celular, e sem o contentor rolavel a tabela esticava o modal
+                  inteiro e criava rolagem horizontal na pagina. */}
+              <div className="overflow-x-auto -mx-1 px-1">
+              <table className="w-full text-sm min-w-[22rem]">
                 <thead className="text-xs text-gray-500">
                   <tr>
                     <th scope="col" className="px-4 py-1.5 text-left font-medium">
@@ -198,6 +202,7 @@ export default function ImportarMotoristasModal({ open, onClose, onImportar, sav
                   ))}
                 </tbody>
               </table>
+              </div>
               {linhas.length > PREVIA_MAXIMA && (
                 <p className="border-t border-gray-50 px-4 py-2 text-xs text-gray-500">
                   e mais {linhas.length - PREVIA_MAXIMA}...

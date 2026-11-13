@@ -1,10 +1,12 @@
-name: CI
+name: CI/CD
 
 on:
   push:
-    branches: [main]
+    # develop tambem roda os testes: e nele que o trabalho se integra no
+    # git-flow, e descobrir uma quebra so na hora de fechar a release e tarde.
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   backend:
@@ -40,3 +42,96 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+
+  deploy:
+    name: Deploy em producao
+    # Publica so o que passou nos dois. Por isso o deploy vive neste arquivo e
+    # nao num separado: `needs` nao atravessa workflows, e as alternativas
+    # (workflow_run) abrem espaco para publicar uma versao que falhou.
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    # Dois deploys simultaneos brigariam pelo mesmo diretorio na instancia.
+    # cancel-in-progress fica falso: interromper um deploy no meio do build
+    # deixaria a instancia num estado pior do que esperar.
+    concurrency:
+      group: deploy-producao
+      cancel-in-progress: false
+
+    permissions:
+      # Unica permissao necessaria: emitir o token OIDC que a AWS troca por
+      # credencial temporaria. Nao ha chave de acesso guardada no repositorio.
+      id-token: write
+      contents: read
+
+    env:
+      AWS_REGION: us-east-1
+
+    steps:
+      - name: Autenticar na AWS por OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Publicar na instancia via SSM
+        env:
+          INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+
+          # Cada linha e um comando separado, e o SSM as junta num script so.
+          # Escrever assim evita aspas dentro de aspas dentro de JSON, que e
+          # onde este tipo de passo costuma quebrar de forma silenciosa.
+          cat > /tmp/parametros.json <<'JSON'
+          {
+            "commands": [
+              "set -euo pipefail",
+              "cd /home/ec2-user/controlog",
+              "sudo -u ec2-user git fetch --prune origin",
+              "sudo -u ec2-user git checkout main",
+              "sudo -u ec2-user git pull --ff-only origin main",
+              "sudo -u ec2-user -H bash scripts/deploy-instancia.sh"
+            ]
+          }
+          JSON
+
+          ID_COMANDO=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy ${GITHUB_SHA::7}" \
+            --timeout-seconds 600 \
+            --parameters file:///tmp/parametros.json \
+            --query Command.CommandId --output text)
+
+          echo "Comando enviado: $ID_COMANDO"
+
+          # O send-command e assincrono e sempre "da certo". Sem acompanhar a
+          # execucao ate o fim, o workflow ficaria verde mesmo com o deploy
+          # quebrado na instancia.
+          ESTADO=Pending
+          for _ in $(seq 1 70); do
+            sleep 10
+            ESTADO=$(aws ssm get-command-invocation \
+              --command-id "$ID_COMANDO" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            echo "estado: $ESTADO"
+            case "$ESTADO" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+          done
+
+          echo "--- saida da instancia ---"
+          aws ssm get-command-invocation \
+            --command-id "$ID_COMANDO" --instance-id "$INSTANCE_ID" \
+            --query StandardOutputContent --output text || true
+
+          if [ "$ESTADO" != "Success" ]; then
+            echo "--- erro ---"
+            aws ssm get-command-invocation \
+              --command-id "$ID_COMANDO" --instance-id "$INSTANCE_ID" \
+              --query StandardErrorContent --output text || true
+            echo "Deploy terminou em $ESTADO"
+            exit 1
+          fi

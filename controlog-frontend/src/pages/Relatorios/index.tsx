@@ -66,7 +66,7 @@ export default function Relatorios() {
     <div className="space-y-6">
 
       {/* ── Cabeçalho ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Relatórios</h1>
           <p className="text-sm text-gray-600">Visão geral do desempenho operacional</p>

@@ -66,7 +66,7 @@ export default function VeiculoFormModal({ open, veiculoEditando, onClose, onSav
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSave)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="veiculo-placa">Placa</Label>
               <Input id="veiculo-placa" {...register('placa')} placeholder="ABC-1234" />
@@ -85,7 +85,7 @@ export default function VeiculoFormModal({ open, veiculoEditando, onClose, onSav
             {errors.modelo && <p className="text-xs text-red-600">{errors.modelo.message}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="veiculo-categoria">Categoria</Label>
               <Select

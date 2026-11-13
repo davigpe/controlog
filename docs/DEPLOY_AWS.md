@@ -46,26 +46,39 @@ alcançá-la por fora pulando o proxy.
 
 ## Estado atual
 
-No ar desde **09/11/2026** em **http://52.71.237.16**, na versão `1.6.1`.
+No ar desde **09/11/2026** em **https://controlog.app**, na versão `1.7.0`.
 
 | Recurso | Valor |
 |---|---|
 | EC2 | `t3.micro`, Amazon Linux 2023, 2 vCPU, 913 MiB + 2 GiB de swap |
 | RDS | `controlog-db`, PostgreSQL, sem acesso público (IP privado na VPC) |
 | Região | `us-east-1` |
+| IP | Elastic IP `35.173.160.71` |
+| Domínio | `controlog.app`, registrado na Cloudflare, DNS only |
+| TLS | Let's Encrypt, renovado pelo Caddy; `www` redireciona para o apex |
 
 Conferido na subida: as sete migrations aplicadas no RDS por TLS
 (`sslmode=require`), seed executado, login pelo proxy, categorias de veículo
 e o filtro por categoria, o relatório de rotas do dia, fallback de rota
 profunda do React Router, `Cache-Control` único nos assets, e os dois limites
 de corpo respondendo 413 — o do nginx (2 MB) e o da aplicação (1 MB, com a
-mensagem que orienta a dividir a planilha). Zero reinícios nos dois
-contêineres.
+mensagem que orienta a dividir a planilha). Zero reinícios nos três
+contêineres (`api`, `web` e `caddy`).
 
-Ainda em **HTTP**: o domínio `controlog.app` foi registrado, mas o Elastic IP
-e o registro `A` faltam, e é deles que depende a emissão do certificado (ver
-passo 6). Os arquivos do HTTPS já estão no repositório e validados com
-`docker compose config`.
+Conferido na virada para HTTPS: certificado válido nos dois nomes, `http`
+respondendo 308 para `https`, `www` respondendo 301 para o apex, HSTS de um
+ano, `Cache-Control` único nos assets e `no-store` no `index.html`, fallback de
+rota profunda, e os dois limites de corpo ainda em 413.
+
+O `TRUST_PROXY=2` foi verificado de ponta a ponta, não só no teste unitário:
+requisições de dois IPs de origem diferentes caem em baldes separados do rate
+limiter (299→298 de um, 294→293 do outro), e um `X-Forwarded-For` forjado não
+cria balde próprio. Fosse o valor errado, os dois IPs compartilhariam o balde
+do contêiner do Caddy.
+
+Backup automático do RDS com retenção de **1 dia**, o teto do plano gratuito
+da conta (ver *Backup* no passo 8). Orçamento de US$ 10/mês com alertas em
+85% real, 100% previsto e 100% real.
 
 O que ainda não foi exercitado em produção: carga real, falha do RDS e
 restauração de snapshot.
@@ -325,17 +338,24 @@ quê. `controlog-backend/tests/trustProxy.test.js` prende essa aritmética.
 
 ```bash
 cd controlog
-docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production up -d
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production up -d --build
 ```
+
+> Na sua máquina existe o atalho `npm run prod:up:https`, mas **não na
+> instância**: lá o Node nunca foi instalado, porque o build acontece dentro
+> do contêiner. No servidor, use a linha do Compose acima.
 
 O `--env-file` é obrigatório aqui, e não era no deploy em HTTP: o domínio é
 lido na interpolação do próprio arquivo do Compose, e a interpolação não
-enxerga o `env_file` dos serviços.
+enxerga o `env_file` dos serviços. Errar esse argumento faz o Compose abortar
+com uma mensagem clara, em vez de subir o Caddy sem domínio.
 
 O certificado é pedido na subida. Para acompanhar:
 
 ```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.https.yml   --env-file .env.production logs -f caddy
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production logs -f caddy
 ```
 
 `certificate obtained successfully` é o que se espera ver.
@@ -361,11 +381,29 @@ curl -s https://seu-dominio.app/health
 
 ## 7. Atualizar o deploy
 
+**O caminho normal é não fazer nada disto:** um push na `main` publica sozinho
+(passo 9). Esta seção é o modo manual, para quando o workflow estiver fora do
+ar ou você precisar intervir na instância.
+
 ```bash
 cd controlog
-git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+git pull --ff-only origin main
+bash scripts/deploy-instancia.sh
 ```
+
+O script é o mesmo que o deploy automático executa: constrói, espera os
+contêineres ficarem saudáveis, confere a aplicação pela porta pública e limpa
+imagens órfãs.
+
+Se precisar chamar o Compose direto, **inclua a sobreposição de HTTPS**:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.https.yml \
+  --env-file .env.production up -d --build
+```
+
+Esquecer o segundo `-f` sobe a pilha sem o Caddy, e o site volta para HTTP com
+a porta 443 sem ninguém escutando.
 
 O Compose recria só o que mudou. As migrations novas são aplicadas pela API
 ao subir.
@@ -384,10 +422,48 @@ docker compose -f docker-compose.prod.yml restart api
 docker compose -f docker-compose.prod.yml down
 ```
 
-**Backup.** O RDS faz snapshot automático se você habilitar na criação
-(retenção de 7 dias é suficiente aqui). Com o perfil `db-local` não há backup
-nenhum: você precisaria agendar um `pg_dump` por conta própria. É o principal
-argumento a favor do RDS.
+**Backup.** O RDS faz snapshot automático diário, e a retenção deste deploy
+está em **1 dia** — não por escolha, mas porque é o máximo que o plano
+gratuito da conta aceita; subir para 7 foi recusado pela própria AWS, e só um
+upgrade de plano remove o limite. Na prática isso significa que um problema
+percebido com mais de um dia de atraso pode não ter snapshot anterior a ele.
+
+A compensação não custa nada: **snapshot manual** antes de qualquer coisa
+arriscada — uma apresentação, uma migration nova, uma mudança de
+infraestrutura. O snapshot manual não obedece à janela de retenção e fica
+guardado até você apagar.
+
+```bash
+# No console: RDS → controlog-db → Actions → Take snapshot
+# Ou, se o CLI tiver permissão de RDS:
+aws rds create-db-snapshot \
+  --db-instance-identifier controlog-db \
+  --db-snapshot-identifier controlog-db-antes-da-apresentacao
+```
+
+Com o perfil `db-local` não há backup nenhum: você precisaria agendar um
+`pg_dump` por conta própria. É o principal argumento a favor do RDS, mesmo
+com a retenção curta.
+
+**Os comprovantes de entrega não estão nesse backup.** As fotos e PDFs ficam
+no volume `controlog-comprovantes`, num disco da EC2; o snapshot do RDS cobre
+só o banco, que guarda apenas os metadados. Restaurar o banco sem o volume
+devolve entregas concluídas cujo comprovante não abre mais — o service
+responde 404 com texto próprio justamente para esse caso ficar legível em vez
+de parecer defeito.
+
+Para copiar o volume antes de um evento de risco:
+
+```bash
+docker run --rm \
+  -v controlog_controlog-comprovantes:/origem:ro \
+  -v "$PWD":/destino alpine \
+  tar czf /destino/comprovantes-$(date +%F).tar.gz -C /origem .
+```
+
+Guardar isso fora da instância (S3, ou a sua máquina) é o que fecha a lacuna.
+Enquanto não houver essa rotina, vale dizer na defesa que a prova de entrega
+tem ponto único de falha — é uma limitação de escopo, não um descuido.
 
 **Acessar o banco de fora.** O RDS não tem acesso público, então use um túnel
 pela EC2:
@@ -396,6 +472,96 @@ pela EC2:
 ssh -i sua-chave.pem -L 5432:SEU-ENDPOINT.rds.amazonaws.com:5432 ec2-user@SEU-IP
 # e conecte o cliente em localhost:5432
 ```
+
+## 9. Deploy automático (GitHub Actions)
+
+Um push na `main` publica sozinho, desde que os testes passem. O workflow é o
+[.github/workflows/ci.yml](../.github/workflows/ci.yml): os jobs `backend` e
+`frontend` rodam sempre, e o `deploy` depende dos dois (`needs`) e só roda em
+push na `main`.
+
+### Por que SSM e não SSH
+
+O security group libera a porta 22 só para um IP fixo, e os runners do GitHub
+têm IP dinâmico. As saídas por SSH seriam abrir a 22 para o mundo ou guardar a
+chave privada da instância como segredo do repositório — nenhuma das duas é
+aceitável.
+
+Com o **Systems Manager** não há porta de entrada nova: a instância abre a
+conexão para fora, e o GitHub manda o comando pela API da AWS. A chave `.pem`
+não sai da sua máquina, e cada execução fica no CloudTrail com o nome de quem
+a disparou.
+
+A autenticação é por **OIDC**: o Actions prova quem é com um token de curta
+duração, trocado por credencial temporária. Não há chave de acesso guardada no
+GitHub. A confiança é amarrada em `repo:<dono>/<repo>:ref:refs/heads/main`, com
+`StringEquals` e sem curinga — outro repositório, ou outro branch, não assume
+a role.
+
+### Criar as identidades
+
+Uma vez só, com o perfil administrativo:
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/cicd.yml \
+  --stack-name controlog-cicd \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides InstanceId=i-0312046515c971063 \
+  --region us-east-1 --profile controlog
+```
+
+O template ([infra/cicd.yml](../infra/cicd.yml)) cria o provider OIDC do
+GitHub, a role que o workflow assume e a role mais o instance profile que
+tornam a instância gerenciável pelo SSM.
+
+### Associar o instance profile
+
+A instância já existia quando o template foi escrito, então o CloudFormation
+não a anexa sozinho:
+
+```bash
+aws ec2 associate-iam-instance-profile \
+  --instance-id i-0312046515c971063 \
+  --iam-instance-profile Name=controlog-ec2-ssm \
+  --region us-east-1 --profile controlog
+```
+
+Não reinicia nada. Em poucos minutos a instância aparece em Systems Manager →
+*Fleet Manager* como nó gerenciado. Para conferir:
+
+```bash
+aws ssm describe-instance-information \
+  --filters Key=InstanceIds,Values=i-0312046515c971063 \
+  --region us-east-1 --profile controlog
+```
+
+### Variáveis no repositório
+
+Em *Settings → Secrets and variables → Actions → **Variables***, não em
+*Secrets*: nenhum dos dois valores é sigiloso, e deixá-los visíveis facilita
+depurar um workflow.
+
+| Nome | Valor |
+|---|---|
+| `AWS_DEPLOY_ROLE_ARN` | a saída `ArnDaRoleDeDeploy` da stack |
+| `AWS_INSTANCE_ID` | `i-0312046515c971063` |
+
+### O que roda na instância
+
+O SSM dá `git pull` na `main` e chama
+[scripts/deploy-instancia.sh](../scripts/deploy-instancia.sh), que constrói,
+espera `api` e `web` ficarem saudáveis, confere `https://<domínio>/health`
+pela porta pública e limpa imagens órfãs.
+
+A verificação é pela porta pública de propósito: um contêiner saudável atrás
+de um proxy quebrado passaria despercebido numa checagem por `localhost`.
+
+Se qualquer etapa falhar, o script sai com erro, o SSM reporta `Failed` e o
+job fica vermelho com as últimas 40 linhas do log do build.
+
+> O `.env.production` continua só na instância. O workflow nunca o toca, e
+> nenhum segredo de produção passa pelo GitHub.
 
 ## Como conferir que subiu certo
 
@@ -445,14 +611,16 @@ versionados neste repositório.
 
 Honestidade sobre os limites deste deploy:
 
-- **Sem automação de provisionamento.** A infraestrutura foi
-  criada à mão pelo console; não há Terraform nem CloudFormation que a
-  reproduza. Recriar do zero é repetir os passos 1 e 2 deste guia.
-- **Ainda em HTTP.** O `Caddyfile` e o `docker-compose.https.yml` estão
-  prontos e validados, mas o certificado só pode ser emitido depois do Elastic
-  IP e do registro `A` — ver passo 6.
-- **Sem deploy automático.** Atualizar é `git pull` + `up -d --build` por SSH.
-  Um workflow do GitHub Actions que faça isso sozinho é um passo natural
-  depois que o deploy manual estiver de pé.
+- **Provisionamento só parcialmente automatizado.** As identidades do deploy
+  (OIDC, roles, instance profile) estão em CloudFormation, em
+  [infra/cicd.yml](../infra/cicd.yml). A infraestrutura que serve a aplicação
+  — VPC, EC2, RDS, security groups — foi criada à mão pelo console e não tem
+  template que a reproduza. Recriar do zero ainda é repetir os passos 1 e 2.
+- **Retenção de backup de 1 dia**, teto do plano gratuito da conta. A
+  compensação é o snapshot manual antes de cada evento de risco — ver *Backup*
+  no passo 8.
+- **Comprovantes de entrega sem backup automático.** Os arquivos ficam num
+  volume do Docker na instância, fora do snapshot do RDS. O procedimento de
+  cópia manual está em *Backup*, no passo 8.
 - **Uma instância só.** Sem redundância: se ela cair, o sistema cai. É
   adequado ao escopo do projeto e não deve ser vendido como outra coisa.

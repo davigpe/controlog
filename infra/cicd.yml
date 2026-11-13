@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+# Identidades do deploy automatico do Controlog.
+#
+# Cria tres coisas, e nenhuma delas guarda credencial em lugar nenhum:
+#
+#   1. O provider OIDC do GitHub, para o Actions provar quem e sem chave.
+#   2. A role que o workflow assume, restrita a este repositorio e a este
+#      branch, com permissao de mandar um comando e nada mais.
+#   3. A role e o instance profile que deixam a EC2 ser gerenciada pelo SSM,
+#      que e o que torna o deploy possivel sem abrir a porta 22.
+#
+# Por que SSM e nao SSH: o security group libera a 22 so para o IP de casa, e
+# os runners do GitHub tem IP dinamico. As alternativas seriam abrir a 22 para
+# o mundo ou guardar a chave privada da instancia como segredo do repositorio.
+# Com o SSM nao ha porta de entrada nova, a chave nao sai da sua maquina, e
+# cada execucao fica registrada no CloudTrail com o nome de quem a disparou.
+#
+# Para criar ou atualizar:
+#   aws cloudformation deploy --template-file infra/cicd.yml \
+#     --stack-name controlog-cicd --capabilities CAPABILITY_NAMED_IAM \
+#     --parameter-overrides InstanceId=i-xxxxxxxx --profile controlog
+
+Description: Identidades OIDC e SSM para o deploy automatico do Controlog
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Default: davigpe
+    Description: Dono do repositorio no GitHub
+
+  GitHubRepo:
+    Type: String
+    Default: controlog
+    Description: Nome do repositorio no GitHub
+
+  DeployBranch:
+    Type: String
+    Default: main
+    Description: Unico branch autorizado a assumir a role de deploy
+
+  InstanceId:
+    Type: AWS::EC2::Instance::Id
+    Description: Instancia EC2 que recebe o deploy
+
+Resources:
+  # A lista de thumbprints existe por compatibilidade: a AWS valida este
+  # provider pelas CAs publicas e ignora o valor. O campo segue aqui porque
+  # omiti-lo em alguns caminhos de criacao ainda gera erro.
+  ProviderOidcDoGitHub:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  # Quem o workflow vira ao rodar.
+  RoleDeDeployDoGitHub:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: controlog-github-deploy
+      Description: Assumida pelo GitHub Actions para disparar o deploy via SSM
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref ProviderOidcDoGitHub
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              # O "aud" impede que um token emitido para outro destino sirva
+              # aqui. Sem ele, a confianca ficaria larga demais.
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # StringEquals, e nao StringLike: nao ha curinga nenhum neste
+                # valor, e um curinga esquecido em "sub" e a forma classica de
+                # deixar qualquer repositorio do GitHub assumir a role.
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOwner}/${GitHubRepo}:ref:refs/heads/${DeployBranch}'
+      Policies:
+        - PolicyName: disparar-deploy-por-ssm
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Mandar o comando, so nesta instancia e so por este documento.
+              - Sid: EnviarComandoNaInstanciaDoControlog
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${InstanceId}'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              # Ler o resultado. Resource "*" nao e desleixo: estas duas acoes
+              # nao aceitam permissao por recurso, e restringi-las por ARN faz
+              # a chamada falhar com AccessDenied.
+              - Sid: AcompanharOResultadoDoComando
+                Effect: Allow
+                Action:
+                  - ssm:GetCommandInvocation
+                  - ssm:ListCommandInvocations
+                Resource: '*'
+
+  # O que deixa a instancia conversar com o SSM.
+  RoleSsmDaInstancia:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: controlog-ec2-ssm
+      Description: Permite que a EC2 do Controlog seja gerenciada pelo Systems Manager
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+
+  PerfilSsmDaInstancia:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: controlog-ec2-ssm
+      Roles:
+        - !Ref RoleSsmDaInstancia
+
+Outputs:
+  ArnDaRoleDeDeploy:
+    Description: Valor de AWS_DEPLOY_ROLE_ARN nas variaveis do repositorio
+    Value: !GetAtt RoleDeDeployDoGitHub.Arn
+
+  NomeDoPerfilDaInstancia:
+    Description: Instance profile a associar a instancia EC2
+    Value: !Ref PerfilSsmDaInstancia
