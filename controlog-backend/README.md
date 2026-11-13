@@ -88,8 +88,10 @@ Os testes unitários injetam um Prisma Client mockado diretamente nos services (
 - `POST /api/auth/refresh` — troca um refresh token válido por um novo access token.
 - `GET /api/auth/me` — dados do usuário autenticado.
 - `POST /api/auth/esqueci-senha` — `{ email }`. Sempre responde 200 com mensagem genérica
-  (não revela se o e-mail existe). Não há provedor de e-mail configurado neste projeto —
-  o link de redefinição é registrado no log do servidor em vez de enviado por e-mail.
+  (não revela se o e-mail existe). O link de redefinição é enviado por e-mail pelo Amazon SES;
+  com `EMAIL_TRANSPORTE=registro` (padrão em desenvolvimento) ele vai para o log do servidor.
+  Falha de envio não altera a resposta — pela mesma razão de não revelar quais e-mails existem —,
+  e fica registrada no log com o destinatário.
 - `POST /api/auth/redefinir-senha` — `{ token, novaSenha }`. Token expira em 1h.
 
 Todas as demais rotas sob `/api` exigem o header `Authorization: Bearer <accessToken>` (RN01).
