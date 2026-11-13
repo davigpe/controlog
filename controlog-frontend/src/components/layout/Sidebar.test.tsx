@@ -25,7 +25,6 @@ describe('Sidebar', () => {
       'Veículos',
       'Motoristas',
       'Rotas',
-      'Otimização de Rotas',
       'Pedidos',
       'Planos',
       'Relatórios',
