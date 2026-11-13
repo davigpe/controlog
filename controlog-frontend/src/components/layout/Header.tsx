@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserCircle } from 'lucide-react'
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserCircle } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -59,15 +59,6 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-        {/* Some no celular: não faz nada ainda e, numa barra estreita, cada
-            elemento inútil empurra o que importa para fora. */}
-        <button
-          aria-label="Notificações"
-          className="hidden sm:block relative text-gray-500 hover:text-gray-800 transition-colors"
-        >
-          <Bell size={20} />
-        </button>
-
         {/* Usuário — no celular sobra o avatar; o nome tem título para quem
             precisar conferir com um toque longo. */}
         <div className="flex items-center gap-2 text-sm text-gray-700 min-w-0">
