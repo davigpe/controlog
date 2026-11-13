@@ -1,6 +1,7 @@
 import { MapPin, User, Calendar, Route } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { nomeDoMotorista } from '@/pages/Rotas/apresentacao'
+import { STATUS_ENTREGA_LABEL } from '@/lib/statusEntrega'
 import type { Entrega } from './types'
 
 interface Props {
@@ -16,14 +17,6 @@ const statusStyle: Record<string, string> = {
   CANCELADA: 'bg-gray-100 text-gray-700',
 }
 
-const statusLabel: Record<string, string> = {
-  ENTREGUE: 'Entregue',
-  EM_TRANSITO: 'Em Trânsito',
-  PENDENTE: 'Pendente',
-  NAO_ENTREGUE: 'Não entregue',
-  CANCELADA: 'Cancelada',
-}
-
 export default function EntregaDetalhes({ entrega, onClose }: Props) {
   if (!entrega) return null
 
@@ -37,7 +30,7 @@ export default function EntregaDetalhes({ entrega, onClose }: Props) {
 
         <div className="space-y-4">
           <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusStyle[entrega.status]}`}>
-            {statusLabel[entrega.status]}
+            {STATUS_ENTREGA_LABEL[entrega.status]}
           </span>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

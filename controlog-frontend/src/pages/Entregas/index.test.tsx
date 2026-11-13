@@ -42,8 +42,11 @@ describe('Entregas', () => {
     expect(await screen.findByText('EN-001')).toBeInTheDocument();
     expect(screen.getByText('RT-001')).toBeInTheDocument();
     expect(screen.getByText('Carlos Silva')).toBeInTheDocument();
-    // "Em Trânsito" aparece tanto no filtro de status quanto no badge da linha
-    expect(screen.getAllByText('Em Trânsito').length).toBeGreaterThan(0);
+    // "Em trânsito" aparece tanto no filtro de status quanto no badge da linha.
+    // Minúscula no "t": as cópias duplicadas do rótulo divergiam na grafia, e a
+    // forma correta em português é esta — maiúscula no meio da frase é
+    // anglicismo.
+    expect(screen.getAllByText('Em trânsito').length).toBeGreaterThan(0);
   });
 
   test('mostra estado vazio quando não há entregas', async () => {

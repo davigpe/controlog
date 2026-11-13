@@ -33,6 +33,7 @@ const rota = (overrides: Partial<RotaDoDia> = {}): RotaDoDia => ({
   criadoEm: '2026-11-06T18:00:00.000Z',
   motorista: { id: 'm1', nome: 'Carlos Silva' },
   veiculo: { id: 'v1', placa: 'ABC-1234', modelo: 'Iveco Daily' },
+  veiculoProprio: false,
   totalEntregas: 4,
   entregasConcluidas: 1,
   ...overrides,
@@ -139,5 +140,33 @@ describe('Rotas do Dia', () => {
 
     expect(await screen.findByText(/Nenhuma rota em 07\/11\/2026/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Exportar Excel/i })).toBeDisabled();
+  });
+});
+
+describe('Rotas do Dia — rota sem motorista ou veículo', () => {
+  // O bug da tela branca: o tipo desta página declarava motorista e veículo
+  // como obrigatórios, ficou para trás quando eles viraram opcionais na 1.9.0,
+  // e o render acessava `.nome` e `.placa` direto. Uma rota aprovada sem
+  // motorista derrubava a página inteira.
+  test('renderiza "A definir" em vez de quebrar', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: relatorio({ rotas: [rota({ motorista: null, veiculo: null, veiculoProprio: false })] }),
+    });
+
+    renderWithProviders(<RotasDoDia />);
+
+    expect(await screen.findByText('RT-001')).toBeInTheDocument();
+    expect(screen.getAllByText('A definir').length).toBeGreaterThan(0);
+  });
+
+  test('mostra "Veículo próprio" quando a rota saiu fora da frota', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: relatorio({ rotas: [rota({ veiculo: null, veiculoProprio: true })] }),
+    });
+
+    renderWithProviders(<RotasDoDia />);
+
+    expect(await screen.findByText('RT-001')).toBeInTheDocument();
+    expect(screen.getByText('Veículo próprio')).toBeInTheDocument();
   });
 });

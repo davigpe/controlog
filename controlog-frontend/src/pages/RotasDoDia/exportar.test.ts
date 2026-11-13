@@ -14,6 +14,7 @@ const rota = (overrides: Partial<RotaDoDia> = {}): RotaDoDia => ({
   criadoEm: '2026-11-06T18:30:00.000Z',
   motorista: { id: 'm1', nome: 'Carlos Silva' },
   veiculo: { id: 'v1', placa: 'ABC-1234', modelo: 'Iveco Daily' },
+  veiculoProprio: false,
   totalEntregas: 4,
   entregasConcluidas: 1,
   ...overrides,

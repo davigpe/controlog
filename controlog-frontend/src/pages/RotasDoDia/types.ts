@@ -16,8 +16,15 @@ export interface RotaDoDia {
   status: StatusRota
   dataHora: string
   criadoEm: string
-  motorista: { id: string; nome: string }
-  veiculo: { id: string; placa: string; modelo: string }
+  /**
+   * Opcionais desde a 1.9.0: a rota pode ser aprovada antes de se definir quem
+   * dirige e em que veículo. Este tipo é próprio desta tela e ficou para trás
+   * naquela mudança — por isso o compilador não acusou os acessos sem proteção
+   * que davam tela branca aqui.
+   */
+  motorista: { id: string; nome: string } | null
+  veiculo: { id: string; placa: string; modelo: string } | null
+  veiculoProprio: boolean
   totalEntregas: number
   entregasConcluidas: number
 }

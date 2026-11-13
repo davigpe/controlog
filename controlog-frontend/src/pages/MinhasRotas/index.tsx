@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AlertTriangle, Calendar, CheckCircle, Clock, MapPin, Package, Truck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
+import { STATUS_ENTREGA_LABEL } from '@/lib/statusEntrega'
 import { useConcluirEntrega, useMinhasRotas, useRegistrarInsucesso } from './api'
 import ComprovantesEntrega from './ComprovantesEntrega'
 import InsucessoModal from './InsucessoModal'
@@ -33,14 +34,6 @@ const entregaStatusStyle: Record<StatusEntrega, string> = {
   ENTREGUE:    'bg-green-100 text-green-700',
   NAO_ENTREGUE:'bg-amber-100 text-amber-800',
   CANCELADA:   'bg-red-100 text-red-700',
-}
-
-const entregaStatusLabel: Record<StatusEntrega, string> = {
-  PENDENTE: 'Pendente',
-  EM_TRANSITO: 'Em trânsito',
-  ENTREGUE: 'Entregue',
-  NAO_ENTREGUE: 'Não entregue',
-  CANCELADA: 'Cancelada',
 }
 
 const entregaStatusIcon: Record<StatusEntrega, React.ReactNode> = {
@@ -195,7 +188,7 @@ export default function MinhasRotas() {
                           <span className="font-medium text-gray-700 shrink-0">{entrega.codigo}</span>
                           <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0 ${entregaStatusStyle[entrega.status]}`}>
                             {entregaStatusIcon[entrega.status]}
-                            {entregaStatusLabel[entrega.status]}
+                            {STATUS_ENTREGA_LABEL[entrega.status]}
                           </span>
                           <span className="text-xs text-gray-600 sm:ml-auto shrink-0">
                             {entrega.dataEfetiva

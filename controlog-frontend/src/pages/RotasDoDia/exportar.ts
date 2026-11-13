@@ -1,4 +1,5 @@
 import { LABEL_BASE, LABEL_STATUS, dataPorExtenso, horarioDaBase } from './formato'
+import { nomeDoMotorista, placaDoVeiculo } from '@/pages/Rotas/apresentacao'
 import type { RotasDoDiaResponse } from './types'
 
 const CABECALHO = [
@@ -39,9 +40,11 @@ export async function exportarRotasDoDia(relatorio: RotasDoDiaResponse): Promise
     { value: horarioDaBase(rota, relatorio.base), type: String },
     { value: rota.origem, type: String },
     { value: rota.destino, type: String },
-    { value: rota.motorista.nome, type: String },
-    { value: rota.veiculo.modelo, type: String },
-    { value: rota.veiculo.placa, type: String },
+    // Mesmos rótulos da tela: uma planilha com célula vazia não diz se o dado
+    // falta ou se a rota saiu em veículo próprio.
+    { value: nomeDoMotorista(rota.motorista), type: String },
+    { value: rota.veiculo?.modelo ?? placaDoVeiculo(rota), type: String },
+    { value: rota.veiculo?.placa ?? placaDoVeiculo(rota), type: String },
     { value: rota.totalEntregas, type: Number },
     { value: rota.entregasConcluidas, type: Number },
     { value: LABEL_STATUS[rota.status], type: String },
