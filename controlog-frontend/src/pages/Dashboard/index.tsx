@@ -1,20 +1,7 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { Truck, Users, Package, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { corDoStatus, rotuloDoStatus } from '@/lib/statusEntrega'
 import { useDashboardResumo } from './api'
-
-const statusLabel: Record<string, string> = {
-  PENDENTE: 'Pendente',
-  EM_TRANSITO: 'Em Trânsito',
-  ENTREGUE: 'Entregue',
-  CANCELADA: 'Cancelada',
-}
-
-const statusColor: Record<string, string> = {
-  PENDENTE: '#ef4444',
-  EM_TRANSITO: '#eab308',
-  ENTREGUE: '#22c55e',
-  CANCELADA: '#9ca3af',
-}
 
 export default function Dashboard() {
   const { data: resumo, isLoading } = useDashboardResumo()
@@ -28,9 +15,9 @@ export default function Dashboard() {
   }
 
   const entregasChart = Object.entries(resumo.entregasPorStatus).map(([status, value]) => ({
-    name: statusLabel[status] ?? status,
+    name: rotuloDoStatus(status),
     value,
-    color: statusColor[status] ?? '#94a3b8',
+    color: corDoStatus(status),
   }))
 
   return (

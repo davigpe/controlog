@@ -127,7 +127,7 @@ export default function EntregaFormModal({ open, entregaEditando, onClose, onSav
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="PENDENTE">Pendente</SelectItem>
-                <SelectItem value="EM_TRANSITO">Em Trânsito</SelectItem>
+                <SelectItem value="EM_TRANSITO">Em trânsito</SelectItem>
                 <SelectItem value="ENTREGUE">Entregue</SelectItem>
                 <SelectItem value="CANCELADA">Cancelada</SelectItem>
               </SelectContent>

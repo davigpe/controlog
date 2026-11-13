@@ -29,14 +29,25 @@ export default function App() {
         <Route path="/esqueci-senha" element={<EsqueciSenha />} />
         <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
+        {/* A ajuda é a única tela que todos os perfis abrem, e por isso é
+            declarada UMA vez, antes dos blocos por perfil.
+            Declará-la dentro dos dois blocos (como estava) não funciona: os
+            dois registram `path="/"`, o React Router casa o primeiro, e um
+            gestor em /ajuda caía no RequireAuth do bloco do motorista — que o
+            rejeitava e o mandava para a tela inicial. No celular, com login de
+            motorista, o mesmo caminho funcionava, porque ali o perfil era o
+            esperado. */}
+        <Route element={<RequireAuth perfis={[...PERFIS_GESTAO, 'MOTORISTA']} />}>
+          <Route path="/" element={<Layout />}>
+            <Route path="ajuda" element={<Ajuda />} />
+          </Route>
+        </Route>
+
         {/* Visão restrita do motorista — compartilha o Layout, mas é a única
             rota que o perfil MOTORISTA consegue abrir. */}
         <Route element={<RequireAuth perfis={['MOTORISTA']} />}>
           <Route path="/" element={<Layout />}>
             <Route path="minhas-rotas" element={<MinhasRotas />} />
-            {/* A ajuda e o unico lugar fora de "Minhas Rotas" que o motorista
-                alcanca: e quem mais precisa de orientacao em campo. */}
-            <Route path="ajuda" element={<Ajuda />} />
           </Route>
         </Route>
 
@@ -55,7 +66,6 @@ export default function App() {
             <Route path="planos/:id" element={<PlanoDetalhe />} />
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="rotas-do-dia" element={<RotasDoDia />} />
-            <Route path="ajuda" element={<Ajuda />} />
           </Route>
         </Route>
       </Routes>

@@ -8,6 +8,7 @@ import EntregaDetalhes from './EntregaDetalhes'
 import EntregaFormModal from './EntregaFormModal'
 import { useCreateEntrega, useDeleteEntrega, useEntregas, useUpdateEntrega } from './api'
 import { nomeDoMotorista } from '@/pages/Rotas/apresentacao'
+import { STATUS_ENTREGA_LABEL } from '@/lib/statusEntrega'
 import type { Entrega, EntregaInput, StatusEntrega } from './types'
 
 const statusOptions: StatusEntrega[] = [
@@ -24,14 +25,6 @@ const statusStyle: Record<StatusEntrega, string> = {
   PENDENTE: 'bg-red-100 text-red-700',
   NAO_ENTREGUE: 'bg-amber-100 text-amber-800',
   CANCELADA: 'bg-gray-100 text-gray-700',
-}
-
-const statusLabel: Record<StatusEntrega, string> = {
-  PENDENTE: 'Pendente',
-  EM_TRANSITO: 'Em Trânsito',
-  ENTREGUE: 'Entregue',
-  NAO_ENTREGUE: 'Não entregue',
-  CANCELADA: 'Cancelada',
 }
 
 // ─── Componente ───────────────────────────────────────────────────────────────
@@ -136,7 +129,7 @@ export default function Entregas() {
                     : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'
                 }`}
               >
-                {s === 'Todos' ? 'Todos' : statusLabel[s]}
+                {s === 'Todos' ? 'Todos' : STATUS_ENTREGA_LABEL[s]}
               </button>
             ))}
           </div>
@@ -185,7 +178,7 @@ export default function Entregas() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusStyle[entrega.status]}`}>
-                        {statusLabel[entrega.status]}
+                        {STATUS_ENTREGA_LABEL[entrega.status]}
                       </span>
                     </td>
                     <td className="px-6 py-4">

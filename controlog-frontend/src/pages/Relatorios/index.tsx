@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { Package, Users, Route, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { rotuloPluralDoStatus } from '@/lib/statusEntrega'
 import { useRelatorio } from './api'
 
 type Periodo = '7d' | '30d' | '90d' | 'tudo'
@@ -27,9 +28,6 @@ function calcularIntervalo(periodo: Periodo) {
 }
 
 const rotaStatusLabel: Record<string, string> = { ATIVA: 'Ativas', CONCLUIDA: 'Concluídas', CANCELADA: 'Canceladas' }
-const entregaStatusLabel: Record<string, string> = {
-  PENDENTE: 'Pendentes', EM_TRANSITO: 'Em Trânsito', ENTREGUE: 'Entregues', CANCELADA: 'Canceladas',
-}
 
 export default function Relatorios() {
   const [periodo, setPeriodo] = useState<Periodo>('30d')
@@ -46,7 +44,7 @@ export default function Relatorios() {
 
   const entregasChart = useMemo(
     () => Object.entries(relatorio?.entregasPorStatus ?? {}).map(([status, value]) => ({
-      status: entregaStatusLabel[status] ?? status,
+      status: rotuloPluralDoStatus(status),
       total: value,
     })),
     [relatorio]
@@ -94,7 +92,7 @@ export default function Relatorios() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard icon={<Package size={20} />} label="Total de Entregas" value={kpis.total} color="blue" />
             <KpiCard icon={<CheckCircle size={20} />} label="Entregues" value={kpis.entregues} color="green" />
-            <KpiCard icon={<Clock size={20} />} label="Em Trânsito" value={kpis.emTransito} color="yellow" />
+            <KpiCard icon={<Clock size={20} />} label="Em trânsito" value={kpis.emTransito} color="yellow" />
             <KpiCard icon={<XCircle size={20} />} label="Canceladas" value={kpis.canceladas} color="red" />
           </div>
 

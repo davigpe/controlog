@@ -12,6 +12,7 @@ import {
   hojeISO,
   horarioDaBase,
 } from './formato'
+import { nomeDoMotorista, placaDoVeiculo } from '@/pages/Rotas/apresentacao'
 import type { BaseDoDia, RotaDoDia } from './types'
 
 const statusStyle: Record<RotaDoDia['status'], string> = {
@@ -137,10 +138,20 @@ export default function RotasDoDia() {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-700">{rota.codigo}</td>
                   <td className="px-4 py-3 text-gray-700">{rota.destino}</td>
-                  <td className="px-4 py-3 text-gray-700">{rota.motorista.nome}</td>
+                  <td className={`px-4 py-3 ${rota.motorista ? 'text-gray-700' : 'text-gray-500 italic'}`}>
+                    {nomeDoMotorista(rota.motorista)}
+                  </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {rota.veiculo.modelo}
-                    <span className="block font-mono text-xs text-gray-500">{rota.veiculo.placa}</span>
+                    {rota.veiculo ? (
+                      <>
+                        {rota.veiculo.modelo}
+                        <span className="block font-mono text-xs text-gray-500">
+                          {rota.veiculo.placa}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500 italic">{placaDoVeiculo(rota)}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-700">
                     {rota.entregasConcluidas} de {rota.totalEntregas}
