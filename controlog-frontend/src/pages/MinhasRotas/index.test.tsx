@@ -31,6 +31,7 @@ const resposta: MinhasRotasResposta = {
       coordenadasOrigem: [-26.3045, -48.8487],
       coordenadasDestino: [-26.28, -48.84],
       veiculo: { id: 'v1', placa: 'ABC-1234', modelo: 'Mercedes Sprinter' },
+      veiculoProprio: false,
       entregas: [
         {
           id: 'e1',
@@ -310,5 +311,42 @@ describe('comprovante obrigatório para concluir', () => {
     // Há uma única entrega aberta (EN-001); a concluída (EN-002) não pode mais
     // receber anexo, então o botão não se multiplica.
     expect(screen.getAllByRole('button', { name: /anexar comprovante/i })).toHaveLength(1);
+  });
+});
+
+describe('Minhas Rotas — rota sem veículo da frota', () => {
+  // O bug: aprovar uma rota para o motorista com veículo "A definir" ou
+  // "Veículo próprio" deixava rota.veiculo nulo, e a tela acessava
+  // `.placa` direto — tela branca ao recarregar. O tipo desta página declarava
+  // o veículo como obrigatório e ficou para trás na 1.9.0, por isso o
+  // compilador não acusou.
+  function respostaComVeiculo(veiculo: MinhasRotasResposta['rotas'][0]['veiculo'], proprio: boolean) {
+    return {
+      ...resposta,
+      rotas: [{ ...resposta.rotas[0], veiculo, veiculoProprio: proprio }],
+    };
+  }
+
+  test('rota sem veículo definido renderiza em vez de quebrar', async () => {
+    mockedApi.get.mockResolvedValue({ data: respostaComVeiculo(null, false) });
+    renderWithProviders(<MinhasRotas />);
+
+    expect(await screen.findByText('RT-001')).toBeInTheDocument();
+    expect(screen.getByText('A definir')).toBeInTheDocument();
+  });
+
+  test('rota com veículo próprio mostra o rótulo certo', async () => {
+    mockedApi.get.mockResolvedValue({ data: respostaComVeiculo(null, true) });
+    renderWithProviders(<MinhasRotas />);
+
+    expect(await screen.findByText('RT-001')).toBeInTheDocument();
+    expect(screen.getByText('Veículo próprio')).toBeInTheDocument();
+  });
+
+  test('rota com veículo da frota continua mostrando placa e modelo', async () => {
+    mockedApi.get.mockResolvedValue({ data: resposta });
+    renderWithProviders(<MinhasRotas />);
+
+    expect(await screen.findByText(/ABC-1234 — Mercedes Sprinter/)).toBeInTheDocument();
   });
 });

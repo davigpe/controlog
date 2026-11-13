@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AlertTriangle, Calendar, CheckCircle, Clock, MapPin, Package, Truck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/api'
+import { descricaoDoVeiculo } from '@/pages/Rotas/apresentacao'
 import { STATUS_ENTREGA_LABEL } from '@/lib/statusEntrega'
 import { useConcluirEntrega, useMinhasRotas, useRegistrarInsucesso } from './api'
 import ComprovantesEntrega from './ComprovantesEntrega'
@@ -152,7 +153,9 @@ export default function MinhasRotas() {
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Truck size={14} className="text-blue-500" />
-                    {rota.veiculo.placa} — {rota.veiculo.modelo}
+                    {rota.veiculo
+                      ? `${rota.veiculo.placa} — ${rota.veiculo.modelo}`
+                      : descricaoDoVeiculo(rota)}
                   </span>
                 </div>
               </header>

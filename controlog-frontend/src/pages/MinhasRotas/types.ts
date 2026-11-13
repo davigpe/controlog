@@ -40,7 +40,14 @@ export interface MinhaRota {
   dataHora: string
   coordenadasOrigem: [number, number]
   coordenadasDestino: [number, number]
-  veiculo: { id: string; placa: string; modelo: string }
+  /**
+   * Nulo quando a rota foi aprovada sem veículo definido, ou quando o motorista
+   * usa veículo próprio — ver veiculoProprio. Este tipo é próprio desta tela e
+   * ficou para trás quando os vínculos viraram opcionais na 1.9.0, que é por que
+   * o compilador não acusou o acesso direto a `.placa` aqui.
+   */
+  veiculo: { id: string; placa: string; modelo: string } | null
+  veiculoProprio: boolean
   entregas: EntregaDaRota[]
 }
 
