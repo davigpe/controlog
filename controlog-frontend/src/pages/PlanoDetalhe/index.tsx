@@ -60,7 +60,7 @@ function TabelaPedidos({ pedidos }: { pedidos: PedidoDoPlano[] }) {
           {pedidos.map((pedido) => (
             <tr key={pedido.id} className="border-t">
               <td className="px-4 py-3 font-medium">{pedido.codigo}</td>
-              <td className="px-4 py-3">{pedido.cliente}</td>
+              <td className="px-4 py-3">{pedido.clienteNome}</td>
               <td className="px-4 py-3">{pedido.endereco}</td>
               <td className="px-4 py-3">{pedido.cidade}</td>
               <td className="px-4 py-3">{pedido.unidades}</td>

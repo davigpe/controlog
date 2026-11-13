@@ -1,71 +1,34 @@
 import { randomUUID } from 'node:crypto';
 import { paginationArgs, paginationMeta } from '../utils/pagination.js';
-
-const RAIO_KM_PADRAO = 1.3;
-const KM_POR_GRAU_LATITUDE = 111.32;
-
-const RUAS = [
-  'Rua das Palmeiras',
-  'Av. Getúlio Vargas',
-  'Rua XV de Novembro',
-  'Rua Dona Francisca',
-  'Av. Santos Dumont',
-  'Rua Blumenau',
-  'Rua São Paulo',
-  'Av. Juscelino Kubitschek',
-  'Rua Anita Garibaldi',
-  'Rua Marechal Deodoro',
-];
-
-const CLIENTES = [
-  'Mercado Bom Preço',
-  'Farmácia Vida',
-  'Auto Peças União',
-  'Supermercado Ideal',
-  'Loja Center Móveis',
-  'Distribuidora Sul',
-  'Comércio Estrela',
-  'Atacado Popular',
-  'Mercearia Cantinho',
-  'Ferragens Rocha',
-];
-
-// Mesmas coordenadas aproximadas de bairros reais de Joinville usadas em
-// controlog-frontend/src/pages/OtimizacaoRotas/gerarPedidos.ts — mantém os
-// pedidos fictícios coerentes com bairro/endereço sem geocoding real.
-const BAIRROS = [
-  { nome: 'Centro', lat: -26.3044, lng: -48.8464 },
-  { nome: 'América', lat: -26.292, lng: -48.856 },
-  { nome: 'Anita Garibaldi', lat: -26.3195, lng: -48.8497 },
-  { nome: 'Bucarein', lat: -26.316, lng: -48.84 },
-  { nome: 'Costa e Silva', lat: -26.276, lng: -48.846 },
-  { nome: 'Glória', lat: -26.29, lng: -48.875 },
-  { nome: 'Iririú', lat: -26.273, lng: -48.827 },
-  { nome: 'Saguaçu', lat: -26.285, lng: -48.839 },
-];
+import { ValidationError } from '../utils/AppError.js';
 
 function escolher(lista) {
   return lista[Math.floor(Math.random() * lista.length)];
 }
 
-function gerarUmPedido() {
-  const bairro = escolher(BAIRROS);
-  const kmPorGrauLongitude = KM_POR_GRAU_LATITUDE * Math.cos((bairro.lat * Math.PI) / 180);
-
-  const angulo = Math.random() * 2 * Math.PI;
-  const distanciaKm = Math.sqrt(Math.random()) * RAIO_KM_PADRAO;
-
-  const lat = bairro.lat + (distanciaKm * Math.cos(angulo)) / KM_POR_GRAU_LATITUDE;
-  const lng = bairro.lng + (distanciaKm * Math.sin(angulo)) / kmPorGrauLongitude;
-  const numero = Math.floor(Math.random() * 2000) + 1;
-
+/**
+ * Monta um pedido no endereço de um cliente cadastrado.
+ *
+ * Antes, cada pedido sorteava uma rua de uma lista, um número qualquer e um
+ * ponto aleatório num raio em volta do centro do bairro. Duas consequências
+ * ruins: o endereço escrito não correspondia ao ponto no mapa, e dois pedidos
+ * nunca caíam no mesmo lugar — o que escondia o caso mais comum da operação,
+ * que é o mesmo cliente comprando mais de um item.
+ *
+ * Agora a coordenada é a do cadastro, então pedidos do mesmo cliente coincidem
+ * exatamente. O endereço e o nome são copiados para o pedido de propósito: são
+ * um instantâneo, e o histórico precisa continuar correto se o cliente mudar
+ * de endereço ou for renomeado depois.
+ */
+function pedidoParaCliente(cliente) {
   return {
     codigo: `PED-${randomUUID().slice(0, 8).toUpperCase()}`,
-    cliente: escolher(CLIENTES),
-    endereco: `${escolher(RUAS)}, ${numero}`,
-    cidade: bairro.nome,
-    lat,
-    lng,
+    clienteId: cliente.id,
+    clienteNome: cliente.nome,
+    endereco: cliente.endereco,
+    cidade: cliente.bairro,
+    lat: cliente.lat,
+    lng: cliente.lng,
     unidades: Math.floor(Math.random() * 20) + 1,
     volumeM3: Math.round((Math.random() * 0.9 + 0.1) * 100) / 100,
   };
@@ -74,10 +37,26 @@ function gerarUmPedido() {
 export function createPedidoService(prisma) {
   return {
     async gerar({ quantidade }) {
-      const dados = Array.from({ length: quantidade }, gerarUmPedido);
+      const clientes = await prisma.cliente.findMany({ where: { ativo: true } });
+      if (clientes.length === 0) {
+        // Falha explícita em vez de gerar pedido sem destino: sem cadastro não
+        // há endereço real, e inventar um reintroduziria o problema que o
+        // cadastro resolve.
+        throw new ValidationError(
+          'Nenhum cliente ativo cadastrado. Cadastre clientes antes de gerar pedidos.'
+        );
+      }
+
+      // Sorteio com reposição, de propósito: o mesmo cliente pode receber mais
+      // de um pedido, que é como a operação real se comporta e é o caso que o
+      // mapa agrupa.
+      const dados = Array.from({ length: quantidade }, () => pedidoParaCliente(escolher(clientes)));
       await prisma.pedido.createMany({ data: dados });
       const codigos = dados.map((p) => p.codigo);
-      return prisma.pedido.findMany({ where: { codigo: { in: codigos } }, orderBy: { criadoEm: 'asc' } });
+      return prisma.pedido.findMany({
+        where: { codigo: { in: codigos } },
+        orderBy: { criadoEm: 'asc' },
+      });
     },
 
     async list({ disponivel, page = 1, pageSize = 10 } = {}) {

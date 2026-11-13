@@ -8,10 +8,12 @@ const pageTitles: Record<string, string> = {
   '/entregas':      'Entregas',
   '/veiculos':      'Veículos',
   '/motoristas':    'Motoristas',
+  '/clientes':      'Clientes',
   '/rotas':         'Rotas',
   '/atribuicoes':   'Atribuição de Rotas',
   '/relatorios':    'Relatórios',
   '/minhas-rotas':  'Minhas Rotas',
+  '/ajuda':         'Central de ajuda',
 }
 
 export default function Header() {

@@ -2,7 +2,14 @@ import { useMemo, useState } from 'react';
 import { MapContainer, Marker, Polyline, Popup, TileLayer } from 'react-leaflet';
 import { Warehouse } from 'lucide-react';
 import { aplicarFixIconesLeaflet } from '@/lib/leafletIconFix';
-import { CINZA_SELECAO, depositoIcon, iconeColorido, pedidoIcon } from '@/lib/mapaIcones';
+import {
+  CINZA_SELECAO,
+  depositoIcon,
+  iconeColorido,
+  iconePedidoAgrupado,
+  pedidoIcon,
+} from '@/lib/mapaIcones';
+import { agruparPorPonto } from '@/lib/agruparPorPonto';
 import { AjustarBounds, CapturaCliqueDesenho, PoligonoDesenho } from '@/components/shared/mapaDesenho';
 import type { Coordenada, ResultadoOtimizacao } from '@/pages/OtimizacaoRotas/types';
 import type { Pedido } from '@/pages/Pedidos/types';
@@ -94,42 +101,93 @@ export default function PlanoMapa({
         </Popup>
       </Marker>
 
-      {naoAtribuidos.map((pedido) => (
-        <Marker
-          key={pedido.id}
-          position={[pedido.lat, pedido.lng]}
-          icon={
-            pedidosSelecionadosIds.has(pedido.id)
-              ? iconeColorido(CINZA_SELECAO, undefined, true)
-              : pedidoIcon
-          }
-          interactive={!modoDesenho}
-        >
-          <Popup>{pedido.endereco} — sem rota</Popup>
-        </Marker>
-      ))}
+      {/* Agrupado por coordenada: pedidos do mesmo cliente coincidem no ponto, e
+          sem agrupar o Leaflet os empilha — quatro pedidos viram um pino só. */}
+      {agruparPorPonto(naoAtribuidos).map((ponto) => {
+        const algumSelecionado = ponto.itens.some((p) => pedidosSelecionadosIds.has(p.id));
+        const varios = ponto.itens.length > 1;
+        return (
+          <Marker
+            key={ponto.chave}
+            position={[ponto.lat, ponto.lng]}
+            icon={
+              varios
+                ? iconePedidoAgrupado(ponto.itens.length, algumSelecionado)
+                : algumSelecionado
+                  ? iconeColorido(CINZA_SELECAO, undefined, true)
+                  : pedidoIcon
+            }
+            interactive={!modoDesenho}
+          >
+            <Popup>
+              <span className="font-medium">{ponto.itens[0].endereco}</span>
+              <br />
+              {varios ? (
+                <>
+                  {ponto.itens.length} pedidos sem rota neste endereço:
+                  <br />
+                  {ponto.itens.map((p) => (
+                    <span key={p.id}>
+                      {p.codigo} — {p.unidades} un.
+                      <br />
+                    </span>
+                  ))}
+                </>
+              ) : (
+                'sem rota'
+              )}
+            </Popup>
+          </Marker>
+        );
+      })}
 
       {grupos.flatMap((grupo) => {
         const ordemPorId = new Map((grupo.resultado?.ordem ?? []).map((p) => [p.id, p.posicao]));
         const emFoco = !grupoEmFocoIndice || grupoEmFocoIndice === grupo.indice;
 
-        return grupo.pedidos.map((pedido) => (
-          <Marker
-            key={pedido.id}
-            position={[pedido.lat, pedido.lng]}
-            icon={iconeColorido(
-              grupo.cor,
-              ordemPorId.get(pedido.id),
-              pedidosSelecionadosIds.has(pedido.id)
-            )}
-            opacity={emFoco ? 1 : 0.35}
-            interactive={!modoDesenho}
-          >
-            <Popup>
-              {pedido.endereco} — Rota {grupo.indice}
-            </Popup>
-          </Marker>
-        ));
+        return agruparPorPonto(grupo.pedidos).map((ponto) => {
+          const posicoes = ponto.itens
+            .map((p) => ordemPorId.get(p.id))
+            .filter((n): n is number => n !== undefined)
+            .sort((a, b) => a - b);
+          const algumSelecionado = ponto.itens.some((p) => pedidosSelecionadosIds.has(p.id));
+          const varios = ponto.itens.length > 1;
+
+          return (
+            <Marker
+              key={ponto.chave}
+              position={[ponto.lat, ponto.lng]}
+              icon={iconeColorido(
+                grupo.cor,
+                // A primeira parada do ponto: o motorista chega uma vez e
+                // entrega tudo, então é a posição dela que importa na ordem.
+                posicoes[0],
+                algumSelecionado,
+                ponto.itens.length
+              )}
+              opacity={emFoco ? 1 : 0.35}
+              interactive={!modoDesenho}
+            >
+              <Popup>
+                <span className="font-medium">{ponto.itens[0].endereco}</span>
+                <br />
+                Rota {grupo.indice}
+                {varios && (
+                  <>
+                    {' '}— {ponto.itens.length} pedidos nesta parada
+                    <br />
+                    {ponto.itens.map((p) => (
+                      <span key={p.id}>
+                        {p.codigo} — {p.unidades} un.
+                        <br />
+                      </span>
+                    ))}
+                  </>
+                )}
+              </Popup>
+            </Marker>
+          );
+        });
       })}
 
       {grupos.map((grupo) => {

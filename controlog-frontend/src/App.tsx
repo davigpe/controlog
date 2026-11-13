@@ -10,6 +10,7 @@ import Dashboard   from './pages/Dashboard'
 import Entregas    from './pages/Entregas'
 import Veiculos    from './pages/Veiculos'
 import Motoristas  from './pages/Motoristas'
+import Clientes    from './pages/Clientes'
 import Rotas       from './pages/Rotas'
 import Atribuicoes from './pages/Atribuicoes'
 import OtimizacaoRotas from './pages/OtimizacaoRotas'
@@ -18,6 +19,7 @@ import Planos from './pages/Planos'
 import PlanoDetalhe from './pages/PlanoDetalhe'
 import Relatorios from './pages/Relatorios'
 import RotasDoDia from './pages/RotasDoDia'
+import Ajuda from './pages/Ajuda'
 
 export default function App() {
   return (
@@ -32,6 +34,9 @@ export default function App() {
         <Route element={<RequireAuth perfis={['MOTORISTA']} />}>
           <Route path="/" element={<Layout />}>
             <Route path="minhas-rotas" element={<MinhasRotas />} />
+            {/* A ajuda e o unico lugar fora de "Minhas Rotas" que o motorista
+                alcanca: e quem mais precisa de orientacao em campo. */}
+            <Route path="ajuda" element={<Ajuda />} />
           </Route>
         </Route>
 
@@ -41,6 +46,7 @@ export default function App() {
             <Route path="entregas"   element={<Entregas />}   />
             <Route path="veiculos"   element={<Veiculos />}   />
             <Route path="motoristas" element={<Motoristas />} />
+            <Route path="clientes"   element={<Clientes />} />
             <Route path="rotas"      element={<Rotas />}      />
             <Route path="atribuicoes" element={<Atribuicoes />} />
             <Route path="otimizacao-rotas" element={<OtimizacaoRotas />} />
@@ -49,6 +55,7 @@ export default function App() {
             <Route path="planos/:id" element={<PlanoDetalhe />} />
             <Route path="relatorios" element={<Relatorios />} />
             <Route path="rotas-do-dia" element={<RotasDoDia />} />
+            <Route path="ajuda" element={<Ajuda />} />
           </Route>
         </Route>
       </Routes>

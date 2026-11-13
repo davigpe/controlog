@@ -248,7 +248,6 @@ model Plano {
 model Pedido {
   id       String   @id @default(uuid())
   codigo   String   @unique
-  cliente  String
   endereco String
   cidade   String
   lat      Float
@@ -256,6 +255,18 @@ model Pedido {
   unidades Int
   volumeM3 Float    @map("volume_m3")
   criadoEm DateTime @default(now()) @map("criado_em")
+
+  // Cliente a quem o pedido pertence. Opcional porque pedidos criados antes do
+  // cadastro existir nao tem a quem apontar, e porque a importacao de um ERP
+  // pode trazer um pedido cujo cliente ainda nao foi cadastrado.
+  clienteId String?  @map("cliente_id")
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  // Nome do cliente no momento do pedido. Redundante com cliente.nome de
+  // proposito: e um instantaneo. Se o cadastro for renomeado ou removido, o
+  // historico de pedidos continua dizendo para quem aquela entrega foi feita.
+  // Mesmo motivo de endereco/lat/lng ficarem aqui e nao so no cadastro.
+  clienteNome String @map("cliente_nome")
 
   planoId   String? @map("plano_id")
   plano     Plano?  @relation(fields: [planoId], references: [id], onDelete: SetNull)
@@ -268,4 +279,41 @@ model Pedido {
   rota   Rota?   @relation(fields: [rotaId], references: [id], onDelete: SetNull)
 
   @@map("pedidos")
+}
+
+// Carteira de clientes, com endereco geocodificado uma vez e reaproveitado.
+//
+// Antes disto, cada pedido ficticio inventava rua, numero e um ponto aleatorio
+// perto do centro do bairro: o endereco escrito nao correspondia ao ponto no
+// mapa, e dois pedidos do mesmo cliente caiam em lugares diferentes. Com o
+// cadastro, o pedido nasce na coordenada real do cliente — e varios pedidos do
+// mesmo cliente caem exatamente no mesmo ponto, que e o caso que o mapa agora
+// precisa mostrar agrupado.
+model Cliente {
+  id     String @id @default(uuid())
+  // Identificador de negocio (CLI-001), estavel e legivel. E por ele que um
+  // pedido vindo de fora se vincula ao cadastro, nao pelo uuid.
+  codigo String @unique
+  nome   String
+
+  // Endereco de entrega. A coordenada vem de geocodificacao feita no momento
+  // do cadastro, nao em cada uso: o roteamento precisa dela a todo instante, e
+  // depender de um servico externo para exibir um ponto no mapa tornaria o
+  // mapa refem da disponibilidade dele.
+  endereco String
+  bairro   String
+  cidade   String @default("Joinville")
+  uf       String @default("SC")
+  lat      Float
+  lng      Float
+
+  // Inativo some das sugestoes de novo pedido, mas os pedidos antigos dele
+  // continuam existindo — por isso e um sinalizador, e nao exclusao.
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  pedidos Pedido[]
+
+  @@index([ativo])
+  @@map("clientes")
 }

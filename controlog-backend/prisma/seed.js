@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
+import { CLIENTES_DEMO } from './clientesDemo.js';
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -85,7 +87,19 @@ async function main() {
   // módulo de Pedidos/Planos (ver Plano.aprovarRota). A página de Rotas
   // mostra só o que foi de fato aprovado.
 
-  console.log(`Seed concluído: ${motoristasSeed.length} motoristas, ${veiculosSeed.length} veículos.`);
+  // upsert pelo código: rodar o seed de novo atualiza os dados do cliente sem
+  // criar duplicata e sem desvincular os pedidos que já apontam para ele.
+  for (const cliente of CLIENTES_DEMO) {
+    await prisma.cliente.upsert({
+      where: { codigo: cliente.codigo },
+      update: cliente,
+      create: cliente,
+    });
+  }
+
+  console.log(
+    `Seed concluído: ${motoristasSeed.length} motoristas, ${veiculosSeed.length} veículos, ${CLIENTES_DEMO.length} clientes.`
+  );
   console.log(`Login de gestor    -> email: ${gestor.email} | senha: controlog123`);
   console.log(`Login de motorista -> email: ${usuarioMotorista.email} | senha: controlog123`);
 }
