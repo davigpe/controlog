@@ -65,10 +65,11 @@ A EC2 não expõe memória nem espaço em disco. O hipervisor vê CPU, rede e o
 volume, mas não vê dentro do sistema operacional — essas três só saem de dentro.
 
 A forma usual é instalar o agente do CloudWatch. Aqui foi
-[`scripts/metricas-instancia.sh`](../scripts/metricas-instancia.sh) no cron, pelo
-mesmo motivo da escolha do CloudWatch: nesta instância a memória é o recurso
-escasso, e um agente residente consumiria parte justamente do que precisa ser
-medido. O script sobe, publica três valores e sai.
+[`scripts/metricas-instancia.sh`](../scripts/metricas-instancia.sh) disparado por
+um timer do systemd, pelo mesmo motivo da escolha do CloudWatch: nesta instância
+a memória é o recurso escasso, e um agente residente consumiria parte justamente
+do que precisa ser medido. O script sobe, publica três valores e sai — não há
+processo parado ocupando memória entre as execuções.
 
 Dois detalhes dele que não são óbvios:
 
@@ -208,13 +209,36 @@ aws cloudformation deploy \
 > impede o contêiner de subir. É a dependência que mais provavelmente passa
 > despercebida.
 
-### 3. O cron das métricas, na instância
+### 3. O timer das métricas, na instância
+
+```powershell
+ssh -i "C:\Users\davig\Downloads\controlog-key.pem" ec2-user@35.173.160.71
+```
 
 ```bash
+cd ~/controlog
 sudo install -m 755 scripts/metricas-instancia.sh /usr/local/bin/controlog-metricas
-/usr/local/bin/controlog-metricas          # confere que publica antes de agendar
-( crontab -l 2>/dev/null; echo '*/5 * * * * /usr/local/bin/controlog-metricas' ) | crontab -
+
+# Publica uma vez, à mão, antes de agendar: imprime os três valores e mostra na
+# hora se a permissão da role já propagou.
+/usr/local/bin/controlog-metricas
+
+sudo install -m 644 infra/systemd/controlog-metricas.service /etc/systemd/system/
+sudo install -m 644 infra/systemd/controlog-metricas.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now controlog-metricas.timer
+
+systemctl list-timers controlog-metricas.timer
 ```
+
+> **Timer do systemd, e não `crontab`.** O Amazon Linux 2023 **não traz o
+> `cronie` instalado** — `crontab` responde `command not found`. Instalar o
+> cronie resolveria, mas acrescentaria um daemon residente nesta instância de
+> 913 MiB, que é exatamente o recurso que estas métricas existem para vigiar. O
+> systemd já está aqui como PID 1, e o timer tem duas vantagens de brinde:
+> `Persistent=true` executa na volta se a instância estiver desligada na hora do
+> disparo, e `journalctl -u controlog-metricas` dá o histórico de execução, que o
+> cron não dá.
 
 ### 4. O envio de log, quando quiser ligar
 

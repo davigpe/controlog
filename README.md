@@ -76,11 +76,12 @@ controlog/
 ├── infra/
 │   ├── cicd.yml           # CloudFormation: OIDC, role de deploy, perfil da instância
 │   ├── email.yml          # CloudFormation: identidade SES, DKIM, MAIL FROM
-│   └── observabilidade.yml  # CloudFormation: alarmes, painel, log, health check
+│   ├── observabilidade.yml  # CloudFormation: alarmes, painel, log, health check
+│   └── systemd/           # unidade e timer que publicam as métricas da instância
 ├── scripts/
 │   ├── dev.mjs            # sobe banco, API e interface com um comando só
 │   ├── deploy-instancia.sh  # executado na instância pelo CI: build, sobe, verifica
-│   └── metricas-instancia.sh  # cron na instância: memória, swap e disco no CloudWatch
+│   └── metricas-instancia.sh  # memória, swap e disco no CloudWatch (timer do systemd)
 ├── Caddyfile                # TLS automático, HSTS, redireciona www para o apex
 ├── docker-compose.https.yml # sobreposição que põe o Caddy na frente do nginx
 ├── docker-compose.logs.yml  # sobreposição opcional: log da API no CloudWatch
@@ -223,8 +224,9 @@ residentes competiriam pela memória que falta, e o monitoramento cairia junto c
 o que deveria observar.
 
 Memória, swap e disco não são métricas nativas da EC2: vêm de
-[`scripts/metricas-instancia.sh`](scripts/metricas-instancia.sh) no cron, que é
-mais leve do que o agente do CloudWatch pelo mesmo motivo.
+[`scripts/metricas-instancia.sh`](scripts/metricas-instancia.sh), disparado por um
+timer do systemd — mais leve do que o agente do CloudWatch pelo mesmo motivo, e
+sem processo parado ocupando memória entre as execuções.
 
 Como subir, como verificar e o custo de cada item em
 [`docs/OBSERVABILIDADE.md`](docs/OBSERVABILIDADE.md).
