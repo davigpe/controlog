@@ -10,7 +10,7 @@ on:
 
 jobs:
   backend:
-    name: Backend — testes
+    name: Backend — lint e testes
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -23,6 +23,7 @@ jobs:
           cache: npm
           cache-dependency-path: controlog-backend/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm test
 
   frontend:
@@ -43,12 +44,54 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  dependencias:
+    name: Dependencias — auditoria
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      # dependency-review precisa ler o grafo de dependencias do PR.
+      pull-requests: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # O portao e `critical`, nao `high`, e o motivo esta registrado em
+      # docs/SEGURANCA.md: sobram quatro advisories de severidade alta cuja
+      # correcao exige troca de major (prisma 6 para 7, zod 3 para 4) ou nao
+      # existe (deepmerge-ts, transitivo do jest). Portao em `high` ficaria
+      # vermelho de forma permanente, e portao sempre vermelho nao e portao:
+      # deixa de ser lido. Em `critical` ele esta verde hoje e volta a reprovar
+      # no dia em que algo pior entrar.
+      - name: Auditar o backend
+        working-directory: controlog-backend
+        run: npm audit --audit-level=critical
+
+      - name: Auditar o frontend
+        working-directory: controlog-frontend
+        run: npm audit --audit-level=critical
+
+      # Complementa o portao acima com a semantica certa: reprova quando o PR
+      # *introduz* dependencia vulneravel nova, sem depender do nivel absoluto
+      # do projeto. E o que impede a divida conhecida de crescer.
+      - name: Revisar dependencias novas do PR
+        if: github.event_name == 'pull_request'
+        # Versao exata de proposito: esta action nao mantem tag flutuante de
+        # major, so as especificas. `@v4` nao resolve.
+        uses: actions/dependency-review-action@v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
   deploy:
     name: Deploy em producao
-    # Publica so o que passou nos dois. Por isso o deploy vive neste arquivo e
+    # Publica so o que passou nos tres. Por isso o deploy vive neste arquivo e
     # nao num separado: `needs` nao atravessa workflows, e as alternativas
     # (workflow_run) abrem espaco para publicar uma versao que falhou.
-    needs: [backend, frontend]
+    needs: [backend, frontend, dependencias]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
 

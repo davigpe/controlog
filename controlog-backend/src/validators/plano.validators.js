@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
+// Teto de 500 nas listas de pedidos. Não é limite de produto — a geração
+// aceita no máximo 200 por vez, então 500 está folgado para qualquer uso real.
+// É contenção: coleção sem limite superior é a condição do GHSA-mrhx-c7xc-m3w5
+// (zod exaure memória validando coleção grande com restrição de tamanho), e o
+// limite de 1 MB do corpo deixaria passar cerca de 25 mil UUIDs.
+const LIMITE_PEDIDOS_POR_REQUISICAO = 500;
+
+const listaDePedidos = z
+  .array(z.string().uuid('pedidoIds deve conter apenas ids válidos.'))
+  .min(1, 'Selecione ao menos um pedido.')
+  .max(LIMITE_PEDIDOS_POR_REQUISICAO, 'No máximo 500 pedidos por requisição.');
+
 export const createPlanoSchema = z.object({
   nome: z.string().trim().min(1, 'Informe um nome para o plano.'),
-  pedidoIds: z
-    .array(z.string().uuid('pedidoIds deve conter apenas ids válidos.'))
-    .min(1, 'Selecione ao menos um pedido.'),
+  pedidoIds: listaDePedidos,
 });
 
 export const renomearPlanoSchema = z.object({
@@ -18,9 +28,7 @@ export const otimizarPlanoSchema = z.object({
 // rotaIndex null = desatribuir (o pedido fica no plano, mas fora de qualquer
 // rota); um número = mandar pro grupo daquele índice, existente ou novo.
 export const moverPedidosSchema = z.object({
-  pedidoIds: z
-    .array(z.string().uuid('pedidoIds deve conter apenas ids válidos.'))
-    .min(1, 'Selecione ao menos um pedido.'),
+  pedidoIds: listaDePedidos,
   rotaIndex: z.number().int().min(1, 'rotaIndex deve ser 1 ou maior.').nullable(),
 });
 

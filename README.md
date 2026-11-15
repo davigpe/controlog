@@ -66,6 +66,7 @@ controlog/
 │   ├── ARQUITETURA.md              # diagramas C4: contexto, contêineres, componentes
 │   ├── REQUISITOS.md               # requisitos funcionais, regras de negócio, casos de uso
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
+│   ├── SEGURANCA.md                # análise estática, SAST e auditoria de dependências
 │   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
 │   ├── DADOS_DE_DEMONSTRACAO.md    # origem da base de clientes de exemplo
 │   ├── DEPLOY_AWS.md               # deploy em vigor: EC2 + RDS, CI/CD por SSM
@@ -179,6 +180,29 @@ npm run test:coverage
 ```
 
 Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio.
+
+---
+
+## 🔒 Análise estática e segurança
+
+Quatro camadas, todas no CI, nenhuma dependendo de serviço externo:
+
+| Camada | Ferramenta | O que pega |
+|---|---|---|
+| Lint do backend | ESLint + `eslint-plugin-security` | Erro de código e padrão inseguro em Node |
+| Lint do frontend | ESLint + `typescript-eslint` | Erro de código e uso incorreto de *hooks* |
+| SAST | CodeQL | Injeção, XSS e travessia de caminho, seguindo o dado da entrada até o uso |
+| Dependências | `npm audit`, `dependency-review-action`, Dependabot | Vulnerabilidade conhecida em pacote de terceiro |
+
+```bash
+cd controlog-backend && npm run lint && npm audit
+cd controlog-frontend && npm run lint && npm audit
+```
+
+Os achados do CodeQL ficam em *Security → Code scanning*. O que foi
+conscientemente aceito, com o motivo e a exposição real de cada caso, está em
+[`docs/SEGURANCA.md`](docs/SEGURANCA.md) — inclusive as duas migrações de major
+ainda pendentes.
 
 ---
 
