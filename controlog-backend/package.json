@@ -1,6 +1,6 @@
 {
   "name": "controlog-backend",
-  "version": "1.10.2",
+  "version": "1.11.0",
   "description": "API REST do Controlog — Sistema de Gestão Logística",
   "type": "module",
   "main": "src/server.js",
