@@ -269,8 +269,10 @@ Resources:
     Properties:
       AlarmName: controlog-rds-conexoes-altas
       AlarmDescription: >-
-        Conexoes abertas acima de 40. Na db.t3.micro o limite efetivo fica perto
-        de 80, e conexao vazando e a causa mais comum de chegar la.
+        Conexoes abertas acima de 40. O max_connections do banco e a formula
+        padrao LEAST({DBInstanceClassMemory/9531392},5000), que na db.t4g.micro
+        de 1 GiB resulta em algo em torno de 100; 40 e aviso antecipado, e
+        conexao vazando e a causa mais comum de chegar la.
       Namespace: AWS/RDS
       MetricName: DatabaseConnections
       Dimensions:

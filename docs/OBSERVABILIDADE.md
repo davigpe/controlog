@@ -39,8 +39,8 @@ da instância.
 | `controlog-ec2-memoria-alta` | Memória > 90% por 10 min | **O alarme que mais importa nesta instância**, pelo motivo da seção anterior |
 | `controlog-ec2-disco-cheio` | Disco > 85% por 10 min | Imagens Docker e volume de comprovantes crescem na mesma partição |
 | `controlog-rds-cpu-alta` | CPU do banco > 80% por 15 min | Mesmo raciocínio da EC2 |
-| `controlog-rds-espaco-baixo` | Espaço livre < 2 GB | Banco sem espaço recusa escrita, e o sintoma na tela é erro em qualquer cadastro |
-| `controlog-rds-conexoes-altas` | Conexões > 40 por 10 min | Na `db.t3.micro` o limite efetivo fica perto de 80; conexão vazando é a causa mais comum de chegar lá |
+| `controlog-rds-espaco-baixo` | Espaço livre < 2 GB | São 10% dos 20 GB alocados. Banco sem espaço recusa escrita, e o sintoma na tela é erro em qualquer cadastro |
+| `controlog-rds-conexoes-altas` | Conexões > 40 por 10 min | O `max_connections` é a fórmula padrão `LEAST({DBInstanceClassMemory/9531392},5000)`, lida do *parameter group* `default.postgres16`, que na `db.t4g.micro` de 1 GiB resulta em algo em torno de 100. 40 é aviso antecipado; conexão vazando é a causa mais comum de chegar lá |
 | `controlog-app-erros-5xx` | Mais de 5 respostas 5xx em 5 min | Diferente dos alarmes de recurso, mede o que o usuário sente |
 | `controlog-site-fora-do-ar` | `/health` deixa de responder 2× | Verificação de **fora** da AWS |
 
