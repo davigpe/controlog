@@ -1,0 +1,44 @@
+# Envia o log da API para o CloudWatch Logs.
+#
+# Sobreposicao opcional, e nao parte do docker-compose.prod.yml, por um motivo
+# concreto: o driver awslogs impede o contêiner de subir se o grupo de log nao
+# existir. Se isto estivesse no arquivo principal, um ambiente sem a stack
+# infra/observabilidade.yml criada deixaria de subir — e o sintoma seria o
+# deploy falhando no build, longe da causa.
+#
+# Ativacao: acrescentar `CONTROLOG_LOGS_CLOUDWATCH=1` ao .env.production na
+# instancia. O scripts/deploy-instancia.sh le essa variavel e inclui este
+# arquivo. Para desligar, basta remover a linha e publicar de novo.
+#
+# Pre-requisitos:
+#   1. Stack infra/observabilidade.yml criada (ela cria /controlog/aplicacao
+#      com retencao definida).
+#   2. Stack infra/cicd.yml atualizada, para a role da instancia ter
+#      logs:PutLogEvents nesse grupo.
+
+services:
+  api:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: /controlog/aplicacao
+        awslogs-stream: api
+        # A role da instancia nao tem logs:CreateLogGroup de proposito: grupo
+        # criado pelo driver nasceria sem retencao definida e guardaria log para
+        # sempre, cobrando armazenamento todo mes.
+        awslogs-create-group: 'false'
+
+        # A parte que mais importa deste arquivo. No modo padrao, blocking, a
+        # escrita no log bloqueia o processo quando o CloudWatch esta lento ou
+        # inacessivel — ou seja, uma indisponibilidade do servico de log viraria
+        # indisponibilidade da API. Em non-blocking, o Docker usa um buffer em
+        # memoria e descarta log se ele encher, o que e a troca certa: perder
+        # linha de log e muito melhor do que travar requisicao.
+        mode: non-blocking
+        max-buffer-size: 4m
+
+# O log do nginx fica de fora de proposito. Ele registra toda requisicao de
+# arquivo estatico, o que seria a maior parte do volume e quase nenhum sinal: o
+# que diz se a aplicacao esta quebrada e o log da API. Se for preciso investigar
+# algo no proxy, `docker compose logs web` continua disponivel na instancia.

@@ -1,0 +1,57 @@
+version: 2
+
+# O portao do CI reprova criticas novas, mas nao resolve nada sozinho. O
+# Dependabot e a outra metade: abre PR com a atualizacao, e o PR passa pelos
+# mesmos testes antes de entrar.
+#
+# Alvo `develop`, e nao `main`: e nele que o trabalho se integra no git-flow.
+# PR de dependencia direto para `main` furaria o fluxo e chegaria a producao
+# sem passar pela integracao.
+
+updates:
+  - package-ecosystem: npm
+    directory: /controlog-backend
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: develop
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # Agrupadas porque atualizacao de patch raramente precisa de revisao
+      # individual, e cinco PRs por semana de bump de patch viram ruido que
+      # ninguem le.
+      patches:
+        update-types: [patch]
+      # Ferramenta de teste num PR separado: quebra aqui afeta o CI, nao a
+      # aplicacao, e o diagnostico e diferente.
+      testes:
+        patterns: ['jest', 'supertest', '@jest/*']
+
+  - package-ecosystem: npm
+    directory: /controlog-frontend
+    schedule:
+      interval: weekly
+      day: monday
+    target-branch: develop
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      patches:
+        update-types: [patch]
+      ferramenta-de-build:
+        patterns: ['vite', 'vitest', '@vitejs/*', '@vitest/*', 'eslint', 'eslint-*', 'typescript-eslint']
+
+  # As actions sao codigo de terceiro com acesso ao token do workflow. Manter
+  # atualizadas importa tanto quanto as dependencias da aplicacao.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    target-branch: develop
+    commit-message:
+      prefix: ci

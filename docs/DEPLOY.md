@@ -1,12 +1,22 @@
-# Deploy — Controlog
+# Deploy na Vercel + Neon — Controlog (histórico)
 
-Este documento registra a arquitetura de deploy, as URLs, e como reproduzir/atualizar
-o ambiente de produção na Vercel + Neon.
+> ## ⚠️ Documento histórico
+>
+> **Esta arquitetura não está mais em uso.** O sistema roda em infraestrutura
+> própria na AWS desde a migração, em <https://controlog.app> — EC2 com Caddy,
+> nginx e API em contêineres, e banco em RDS PostgreSQL.
+>
+> | Para | Veja |
+> |---|---|
+> | O deploy em vigor | [`DEPLOY_AWS.md`](DEPLOY_AWS.md) |
+> | Os diagramas de arquitetura | [`ARQUITETURA.md`](ARQUITETURA.md) |
+> | Por que a migração aconteceu | a seção *Decisões de projeto* da [wiki](https://github.com/davigpe/controlog/wiki/Decisoes-de-projeto) |
+>
+> O documento é mantido como registro da evolução do projeto: as URLs abaixo não
+> respondem mais, e o procedimento descrito não reproduz o ambiente atual.
 
-> **Este é o deploy atual, em migração.** A mudança para infraestrutura própria na AWS
-> (EC2 + RDS) está preparada em [`DEPLOY_AWS.md`](DEPLOY_AWS.md) — imagens Docker,
-> nginx e Compose já versionados. A Vercel segue no ar até a AWS estar funcionando;
-> nada aqui foi desligado.
+Este documento registrava a arquitetura de deploy, as URLs, e como
+reproduzir/atualizar o ambiente de produção na Vercel + Neon.
 
 ## URLs de produção
 

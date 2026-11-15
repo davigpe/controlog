@@ -1,0 +1,46 @@
+name: Analise estatica de seguranca
+
+# CodeQL: analise estatica de seguranca (SAST). Roda sobre o codigo do backend
+# e do frontend procurando injecao de SQL, XSS, travessia de caminho, uso
+# inseguro de criptografia e outras classes de falha que o lint nao alcanca,
+# porque dependem de seguir o dado da entrada ate o uso.
+#
+# Os achados aparecem na aba Security > Code scanning do repositorio.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Semanal, as segundas de manha. O agendamento existe porque regra nova de
+    # seguranca pode acusar codigo que nao mudou: sem ele, um problema
+    # descoberto depois do ultimo commit nunca apareceria.
+    - cron: '0 9 * * 1'
+
+jobs:
+  analisar:
+    name: CodeQL — JavaScript e TypeScript
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Necessaria para publicar o resultado em Code scanning.
+      security-events: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # `security-and-quality` acrescenta as regras de qualidade as de
+          # seguranca. O custo e algum ruido; o ganho e pegar, por exemplo,
+          # promessa nao aguardada e comparacao sempre falsa.
+          queries: security-and-quality
+
+      - name: Analisar
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript

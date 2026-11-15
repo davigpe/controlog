@@ -1,0 +1,482 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+# Observabilidade do Controlog no CloudWatch: alarmes, painel, grupo de log da
+# aplicacao e verificacao externa de disponibilidade.
+#
+# Stack separada das outras duas pelo mesmo motivo que elas sao separadas entre
+# si: ciclo de vida diferente. Alarme e limite se ajustam com a operacao, e nao
+# se quer que mexer num limiar arrisque a esteira de deploy ou a identidade de
+# e-mail.
+#
+# Para criar ou atualizar:
+#   aws cloudformation deploy --template-file infra/observabilidade.yml \
+#     --stack-name controlog-observabilidade --region us-east-1 \
+#     --profile controlog \
+#     --parameter-overrides InstanceId=<id> IdentificadorDoBanco=<id> \
+#       EmailDeAlerta=<email>
+#
+# Depois de criada, confirme a inscricao do SNS no e-mail recebido. Sem
+# confirmar, os alarmes disparam e nao notificam ninguem.
+#
+# Por que CloudWatch, e nao Prometheus com Grafana: a instancia tem 913 MiB de
+# RAM, e o build do frontend ja foi morto por falta de memoria dentro dela.
+# Subir dois servicos de monitoramento na mesma maquina competiria pela memoria
+# que falta, e o monitoramento cairia junto com o que ele deveria observar.
+
+Description: Alarmes, painel e log da aplicacao Controlog no CloudWatch
+
+Parameters:
+  InstanceId:
+    Type: AWS::EC2::Instance::Id
+    Description: Instancia EC2 que roda a aplicacao
+
+  IdentificadorDoBanco:
+    Type: String
+    Description: DBInstanceIdentifier da instancia RDS PostgreSQL
+
+  EmailDeAlerta:
+    Type: String
+    Description: Endereco que recebe as notificacoes de alarme
+
+  Dominio:
+    Type: String
+    Default: controlog.app
+    Description: Dominio publico verificado pela checagem de disponibilidade
+
+  LimiteDeCpu:
+    Type: Number
+    Default: 80
+    Description: Percentual de CPU que, sustentado, dispara alarme
+
+  EspacoLivreMinimoEmBytes:
+    Type: Number
+    Default: 2000000000
+    Description: >-
+      Espaco livre no RDS abaixo do qual o alarme dispara. Em bytes, que e a
+      unidade da metrica FreeStorageSpace; o padrao equivale a 2 GB.
+
+  DiasDeRetencaoDeLog:
+    Type: Number
+    Default: 14
+    Description: >-
+      Dias de retencao do log da aplicacao. Curto de proposito: o log serve para
+      investigar incidente recente, e retencao longa custa armazenamento todo
+      mes sem ser lida.
+
+  CriarChecagemExterna:
+    Type: String
+    Default: 'sim'
+    AllowedValues: ['sim', 'nao']
+    Description: >-
+      Cria a verificacao de disponibilidade do Route 53. E o unico recurso pago
+      desta stack; os alarmes e o painel cabem no nivel gratuito.
+
+Conditions:
+  ComChecagemExterna: !Equals [!Ref CriarChecagemExterna, 'sim']
+
+Resources:
+  # ---------------------------------------------------------------- notificacao
+
+  TopicoDeAlertas:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: controlog-alertas
+      DisplayName: Alertas Controlog
+
+  InscricaoPorEmail:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref TopicoDeAlertas
+      Protocol: email
+      Endpoint: !Ref EmailDeAlerta
+
+  # ------------------------------------------------------------------------ log
+
+  GrupoDeLogDaAplicacao:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /controlog/aplicacao
+      RetentionInDays: !Ref DiasDeRetencaoDeLog
+
+  # Metrica extraida do proprio log: conta as respostas 5xx que o Express
+  # registra. E o sinal mais direto de que a aplicacao esta quebrada para o
+  # usuario, e nao depende de nenhum agente instalado na instancia.
+  FiltroDeErros5xx:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref GrupoDeLogDaAplicacao
+      # No formato combined do morgan o status vem logo depois da versao do
+      # protocolo e da aspa de fechamento, entao casar `HTTP/1.1" 5` acerta
+      # qualquer 5xx e nada mais. Os dois termos com `?` sao um OU, para cobrir
+      # HTTP/1.0 tambem.
+      #
+      # Correspondencia de termo, e nao expressao regular entre %: o CloudWatch
+      # recusa a aspa e a barra dentro de %...% com "Invalid character(s) in
+      # term". Verificado com `aws logs test-metric-filter`: casa 500, 503 e
+      # 502, e nao casa 200, 422, nem um 200 com content-length 5555 — que seria
+      # o falso positivo obvio de procurar so por "5".
+      FilterPattern: '?"HTTP/1.1\" 5" ?"HTTP/1.0\" 5"'
+      MetricTransformations:
+        - MetricNamespace: Controlog/Aplicacao
+          MetricName: RespostasComErro5xx
+          MetricValue: '1'
+          # Sem este valor, periodo sem erro nenhum fica sem dado em vez de
+          # ficar em zero, e o alarme entra em INSUFFICIENT_DATA em vez de OK.
+          DefaultValue: 0
+
+  # ------------------------------------------------------------- alarmes da EC2
+
+  AlarmeCpuDaInstancia:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-ec2-cpu-alta
+      AlarmDescription: CPU da instancia sustentada acima do limite por 15 minutos
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref LimiteDeCpu
+      ComparisonOperator: GreaterThanThreshold
+      # Tres periodos de cinco minutos, e nao um: a t3.micro e burstable, e um
+      # pico de CPU durante o build do deploy e esperado. O que interessa e CPU
+      # alta sustentada.
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  AlarmeDeVerificacaoDaInstancia:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-ec2-verificacao-falhou
+      AlarmDescription: A instancia falhou na verificacao de status da EC2
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  # Memoria e disco nao sao metricas nativas da EC2: o hipervisor nao ve dentro
+  # do sistema operacional. Vem do script scripts/metricas-instancia.sh, que o
+  # cron executa e que publica em Controlog/Instancia.
+  #
+  # O script existe no lugar do agente do CloudWatch de proposito: nesta
+  # instancia a memoria e o recurso escasso, e o agente residente consumiria
+  # parte justamente do que precisa ser medido. O script sobe, publica e sai.
+  AlarmeMemoriaDaInstancia:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-ec2-memoria-alta
+      AlarmDescription: >-
+        Memoria em uso acima de 90%. Nesta instancia esse e o alarme que mais
+        importa: o build do frontend ja foi morto por falta de memoria aqui.
+      Namespace: Controlog/Instancia
+      MetricName: MemoriaUtilizadaPercentual
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 90
+      ComparisonOperator: GreaterThanThreshold
+      # missing nao e breaching: o script pode nao ter rodado ainda, e alarme
+      # disparando por ausencia de dado logo depois da stack subir seria ruido.
+      TreatMissingData: missing
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  AlarmeDiscoDaInstancia:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-ec2-disco-cheio
+      AlarmDescription: >-
+        Disco acima de 85%. Importa porque as imagens Docker e o volume de
+        comprovantes crescem na mesma particao.
+      Namespace: Controlog/Instancia
+      MetricName: DiscoUtilizadoPercentual
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref InstanceId
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  # ------------------------------------------------------------- alarmes do RDS
+
+  AlarmeCpuDoBanco:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-rds-cpu-alta
+      AlarmDescription: CPU do banco sustentada acima do limite
+      Namespace: AWS/RDS
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref IdentificadorDoBanco
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref LimiteDeCpu
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  AlarmeEspacoDoBanco:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-rds-espaco-baixo
+      AlarmDescription: >-
+        Espaco livre no RDS abaixo do minimo. Banco sem espaco recusa escrita, e
+        o sintoma na aplicacao e erro em qualquer cadastro.
+      Namespace: AWS/RDS
+      MetricName: FreeStorageSpace
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref IdentificadorDoBanco
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref EspacoLivreMinimoEmBytes
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  AlarmeConexoesDoBanco:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-rds-conexoes-altas
+      AlarmDescription: >-
+        Conexoes abertas acima de 40. O max_connections do banco e a formula
+        padrao LEAST({DBInstanceClassMemory/9531392},5000), que na db.t4g.micro
+        de 1 GiB resulta em algo em torno de 100; 40 e aviso antecipado, e
+        conexao vazando e a causa mais comum de chegar la.
+      Namespace: AWS/RDS
+      MetricName: DatabaseConnections
+      Dimensions:
+        - Name: DBInstanceIdentifier
+          Value: !Ref IdentificadorDoBanco
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 40
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+
+  # --------------------------------------------------- alarme de erro 5xx
+
+  AlarmeDeErros5xx:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: controlog-app-erros-5xx
+      AlarmDescription: >-
+        Mais de cinco respostas 5xx em cinco minutos. Diferente dos alarmes de
+        recurso, este mede o que o usuario sente.
+      Namespace: Controlog/Aplicacao
+      MetricName: RespostasComErro5xx
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+
+  # ------------------------------------------------- disponibilidade externa
+
+  # Verificacao de fora da AWS. Os alarmes acima observam recursos; este
+  # responde a pergunta que importa de verdade, que e se o site esta no ar para
+  # quem acessa. Aponta para /health, e nao para a raiz, porque a raiz
+  # responderia o HTML da SPA mesmo com a API caida.
+  ChecagemDeDisponibilidade:
+    Type: AWS::Route53::HealthCheck
+    Condition: ComChecagemExterna
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        FullyQualifiedDomainName: !Ref Dominio
+        ResourcePath: /health
+        Port: 443
+        RequestInterval: 30
+        FailureThreshold: 3
+      HealthCheckTags:
+        - Key: Name
+          Value: controlog-health
+
+  AlarmeDeDisponibilidade:
+    Type: AWS::CloudWatch::Alarm
+    Condition: ComChecagemExterna
+    Properties:
+      AlarmName: controlog-site-fora-do-ar
+      AlarmDescription: O endpoint /health deixou de responder de fora da AWS
+      Namespace: AWS/Route53
+      MetricName: HealthCheckStatus
+      Dimensions:
+        - Name: HealthCheckId
+          Value: !Ref ChecagemDeDisponibilidade
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions:
+        - !Ref TopicoDeAlertas
+      OKActions:
+        - !Ref TopicoDeAlertas
+
+  # ---------------------------------------------------------------------- painel
+
+  Painel:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: controlog
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text", "x": 0, "y": 0, "width": 24, "height": 2,
+              "properties": {
+                "markdown": "# Controlog\n[Site](https://${Dominio}) · [Health](https://${Dominio}/health) · Instancia `${InstanceId}` · Banco `${IdentificadorDoBanco}`"
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 2, "width": 8, "height": 6,
+              "properties": {
+                "title": "Disponibilidade e erros",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "Controlog/Aplicacao", "RespostasComErro5xx", { "stat": "Sum", "label": "Respostas 5xx" } ]
+                ],
+                "period": 300,
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric", "x": 8, "y": 2, "width": 8, "height": 6,
+              "properties": {
+                "title": "Instancia — CPU e memoria",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/EC2", "CPUUtilization", "InstanceId", "${InstanceId}", { "label": "CPU %" } ],
+                  [ "Controlog/Instancia", "MemoriaUtilizadaPercentual", "InstanceId", "${InstanceId}", { "label": "Memoria %" } ],
+                  [ "Controlog/Instancia", "SwapUtilizadoPercentual", "InstanceId", "${InstanceId}", { "label": "Swap %" } ]
+                ],
+                "period": 300,
+                "yAxis": { "left": { "min": 0, "max": 100 } }
+              }
+            },
+            {
+              "type": "metric", "x": 16, "y": 2, "width": 8, "height": 6,
+              "properties": {
+                "title": "Instancia — disco",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "Controlog/Instancia", "DiscoUtilizadoPercentual", "InstanceId", "${InstanceId}", { "label": "Disco %" } ]
+                ],
+                "period": 300,
+                "yAxis": { "left": { "min": 0, "max": 100 } }
+              }
+            },
+            {
+              "type": "metric", "x": 0, "y": 8, "width": 8, "height": 6,
+              "properties": {
+                "title": "Banco — CPU e memoria livre",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", "${IdentificadorDoBanco}", { "label": "CPU %" } ],
+                  [ "AWS/RDS", "FreeableMemory", "DBInstanceIdentifier", "${IdentificadorDoBanco}", { "label": "Memoria livre", "yAxis": "right" } ]
+                ],
+                "period": 300
+              }
+            },
+            {
+              "type": "metric", "x": 8, "y": 8, "width": 8, "height": 6,
+              "properties": {
+                "title": "Banco — conexoes",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", "${IdentificadorDoBanco}", { "stat": "Maximum", "label": "Conexoes" } ]
+                ],
+                "period": 300,
+                "yAxis": { "left": { "min": 0 } }
+              }
+            },
+            {
+              "type": "metric", "x": 16, "y": 8, "width": 8, "height": 6,
+              "properties": {
+                "title": "Banco — espaco livre",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "metrics": [
+                  [ "AWS/RDS", "FreeStorageSpace", "DBInstanceIdentifier", "${IdentificadorDoBanco}", { "stat": "Minimum", "label": "Espaco livre" } ]
+                ],
+                "period": 300
+              }
+            },
+            {
+              "type": "log", "x": 0, "y": 14, "width": 24, "height": 6,
+              "properties": {
+                "title": "Ultimos erros da aplicacao",
+                "region": "${AWS::Region}",
+                "query": "SOURCE '/controlog/aplicacao' | fields @timestamp, @message | filter @message like /(?i)(error|erro|5[0-9][0-9] )/ | sort @timestamp desc | limit 50"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  TopicoDeAlertasArn:
+    Description: Topico SNS que recebe os alarmes. Confirme a inscricao no e-mail.
+    Value: !Ref TopicoDeAlertas
+
+  GrupoDeLog:
+    Description: Grupo de log usado pelo driver awslogs do Docker
+    Value: !Ref GrupoDeLogDaAplicacao
+
+  UrlDoPainel:
+    Description: Painel do CloudWatch
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${Painel}'
+
+  IdDaChecagemExterna:
+    Condition: ComChecagemExterna
+    Description: Id da verificacao de disponibilidade do Route 53
+    Value: !Ref ChecagemDeDisponibilidade

@@ -13,6 +13,7 @@ import { ValidationError } from '../utils/AppError.js';
 
 // Criado na subida, e não a cada upload: se o volume não estiver montado, é
 // melhor descobrir agora do que no meio da primeira entrega do dia.
+// eslint-disable-next-line security/detect-non-literal-fs-filename -- o caminho vem de config/comprovantes.js, montado a partir de variável de ambiente; nenhuma entrada de requisição o alcança.
 fs.mkdirSync(DIRETORIO_COMPROVANTES, { recursive: true });
 
 const armazenamento = multer.diskStorage({

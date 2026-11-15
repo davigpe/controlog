@@ -21,7 +21,13 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
-    testTimeout: 15000,
+    // 30s, e não 15s, por causa da contenção entre as 42 suítes rodando em
+    // paralelo. Os testes de "Minhas Rotas" que registram insucesso levam ~6s
+    // de execução real, medidos com o arquivo isolado, mas passavam de 15s de
+    // tempo de parede quando a máquina estava ocupada com as outras suítes —
+    // falhando por timeout, não por asserção. O limite existe para pegar teste
+    // travado, e 30s continua fazendo isso.
+    testTimeout: 30000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

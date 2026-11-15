@@ -2,6 +2,7 @@
 // olhando o maior número já usado entre os códigos existentes. Códigos que
 // não seguem o formato `${prefixo}NNN` são ignorados.
 export function proximoCodigoSequencial(codigosExistentes, prefixo) {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- `prefixo` nunca vem de requisição: os três chamadores em plano.service.js passam os literais 'RT-' e 'EN-'.
   const regex = new RegExp(`^${prefixo}(\\d+)$`);
 
   const maiorNumero = codigosExistentes.reduce((maior, codigo) => {

@@ -76,6 +76,7 @@ export function createComprovanteService(prisma) {
      */
     async registrar({ entregaId, motoristaId, arquivo }) {
       const limpar = async () => {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- caminhoDoArquivo() resolve e confere que o resultado está contido em DIRETORIO_COMPROVANTES, lançando se escapar.
         await fs.unlink(caminhoDoArquivo(arquivo.filename)).catch(() => {});
       };
 
@@ -140,6 +141,7 @@ export function createComprovanteService(prisma) {
       // O arquivo sai antes da linha: se a ordem fosse inversa e a remoção do
       // arquivo falhasse, o disco ficaria com um órfão que ninguém mais
       // consegue encontrar pelo banco.
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- caminhoDoArquivo() resolve e confere que o resultado está contido em DIRETORIO_COMPROVANTES, lançando se escapar.
       await fs.unlink(caminhoDoArquivo(comprovante.arquivo)).catch(() => {});
       await prisma.comprovanteEntrega.delete({ where: { id: comprovanteId } });
     },
