@@ -104,6 +104,26 @@ O log do nginx fica de fora. Ele registra toda requisição de arquivo estático
 que seria a maior parte do volume e quase nenhum sinal. Para investigar o proxy,
 `docker compose logs web` continua disponível na instância.
 
+### O formato do log é pré-requisito, não detalhe
+
+Fora de desenvolvimento a API usa o formato **`combined`** do morgan. Antes usava
+`dev` em todo ambiente que não fosse teste, e isso quebrava a observabilidade de
+duas formas silenciosas:
+
+- O `dev` escreve `GET /api/rotas 500 12.3 ms - 123` — **sem** a versão do
+  protocolo. O padrão de métrica que conta 5xx nunca casaria, e o alarme
+  `controlog-app-erros-5xx` simplesmente nunca dispararia, sem nada indicando o
+  problema.
+- O `dev` emite códigos ANSI de cor **sempre**, inclusive sem terminal. No
+  CloudWatch isso vira lixo no meio da linha e atrapalha o `parse` das consultas
+  abaixo.
+
+O padrão de métrica usa correspondência de termo, e não expressão regular entre
+`%`: o CloudWatch recusa a aspa e a barra dentro de `%...%` com
+`Invalid character(s) in term`. Foi verificado com `aws logs test-metric-filter`
+— casa 500, 503 e 502, e não casa 200, 422, nem um 200 com `content-length`
+5555, que seria o falso positivo de procurar apenas por `5`.
+
 ### Consultas úteis no Logs Insights
 
 ```sql

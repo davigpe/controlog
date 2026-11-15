@@ -105,9 +105,17 @@ Resources:
     Type: AWS::Logs::MetricFilter
     Properties:
       LogGroupName: !Ref GrupoDeLogDaAplicacao
-      # O morgan escreve o status depois da versao do protocolo. O padrao casa
-      # qualquer linha com status 5xx.
-      FilterPattern: '%HTTP/1\.[01]" 5[0-9]{2} %'
+      # No formato combined do morgan o status vem logo depois da versao do
+      # protocolo e da aspa de fechamento, entao casar `HTTP/1.1" 5` acerta
+      # qualquer 5xx e nada mais. Os dois termos com `?` sao um OU, para cobrir
+      # HTTP/1.0 tambem.
+      #
+      # Correspondencia de termo, e nao expressao regular entre %: o CloudWatch
+      # recusa a aspa e a barra dentro de %...% com "Invalid character(s) in
+      # term". Verificado com `aws logs test-metric-filter`: casa 500, 503 e
+      # 502, e nao casa 200, 422, nem um 200 com content-length 5555 — que seria
+      # o falso positivo obvio de procurar so por "5".
+      FilterPattern: '?"HTTP/1.1\" 5" ?"HTTP/1.0\" 5"'
       MetricTransformations:
         - MetricNamespace: Controlog/Aplicacao
           MetricName: RespostasComErro5xx

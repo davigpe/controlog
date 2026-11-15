@@ -32,7 +32,13 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   if (env.nodeEnv !== 'test') {
-    app.use(morgan('dev'));
+    // `dev` só em desenvolvimento. Ele é concisao e colorido para o terminal,
+    // mas emite códigos ANSI de cor sempre — inclusive sem TTY — e omite data,
+    // IP e versão do protocolo. No CloudWatch isso significa linha suja e, pior,
+    // impossível de filtrar: o padrão de métrica que conta respostas 5xx e as
+    // consultas do Logs Insights em docs/OBSERVABILIDADE.md extraem método,
+    // rota e status do formato `combined`.
+    app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
   }
 
   // RNF04 — proteção básica contra abuso, mantendo a API disponível para os
