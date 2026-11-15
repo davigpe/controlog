@@ -63,12 +63,22 @@ controlog/
 │       ├── stores/          # estado de autenticação (Zustand)
 │       └── lib/             # cliente HTTP (Axios) e utilitários
 ├── docs/
+│   ├── ARQUITETURA.md              # diagramas C4: contexto, contêineres, componentes
+│   ├── REQUISITOS.md               # requisitos funcionais, regras de negócio, casos de uso
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
 │   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
-│   ├── DEPLOY.md                   # arquitetura de deploy atual (Vercel + Neon)
-│   └── DEPLOY_AWS.md               # migração para AWS: EC2 + RDS, passo a passo
+│   ├── DADOS_DE_DEMONSTRACAO.md    # origem da base de clientes de exemplo
+│   ├── DEPLOY_AWS.md               # deploy em vigor: EC2 + RDS, CI/CD por SSM
+│   ├── DEPLOY.md                   # histórico: arquitetura anterior (Vercel + Neon)
+│   └── ROADMAP.md                  # funcionalidades previstas
+├── infra/
+│   ├── cicd.yml           # CloudFormation: OIDC, role de deploy, perfil da instância
+│   └── email.yml          # CloudFormation: identidade SES, DKIM, MAIL FROM
 ├── scripts/
-│   └── dev.mjs            # sobe banco, API e interface com um comando só
+│   ├── dev.mjs            # sobe banco, API e interface com um comando só
+│   └── deploy-instancia.sh  # executado na instância pelo CI: build, sobe, verifica
+├── Caddyfile                # TLS automático, HSTS, redireciona www para o apex
+├── docker-compose.https.yml # sobreposição que põe o Caddy na frente do nginx
 ├── docker-compose.prod.yml  # pilha de produção: nginx + API (+ Postgres opcional)
 ├── .env.production.example  # modelo das variáveis de produção
 ├── package.json           # scripts da raiz (sem dependências próprias)
@@ -184,38 +194,50 @@ escopo em [`docs/AUDITORIA_ACESSIBILIDADE.md`](docs/AUDITORIA_ACESSIBILIDADE.md)
 
 ## 🚀 Deploy
 
-O projeto está publicado na **Vercel** — frontend e backend como dois projetos
-separados (o backend roda como Serverless Function, embrulhando o mesmo Express de
-sempre), com o banco PostgreSQL no **Neon**. Migrations rodam automaticamente a cada
-build do backend.
+O sistema está no ar em **<https://controlog.app>**, em infraestrutura própria na
+**AWS**: uma instância EC2 `t3.micro` roda Caddy, nginx e a API como contêineres
+Docker, e o banco é um **RDS PostgreSQL** na mesma VPC. O site e a API ficam atrás
+do mesmo domínio, então não há CORS a configurar nem URL de API embutida no build.
 
-> Nota: a partir de 2026-02 a disciplina passou a não aceitar hospedagem em
-> plataformas otimizadas só para frontend estático (Vercel/Netlify/Firebase/Render) —
-> essa restrição formalmente continua valendo; a migração para Vercel foi uma decisão
-> consciente do autor do projeto.
+O Caddy termina o TLS e renova o certificado Let's Encrypt sozinho. Os
+comprovantes de entrega ficam em volume Docker, fora da imagem, que é recriada a
+cada deploy.
 
-CI/CD: todo `push`/PR para `main` roda os testes de backend e frontend via GitHub
-Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); os dois projetos na
-Vercel estão conectados ao repositório e fazem deploy automático quando sua respectiva
-pasta muda em `main`. Detalhes completos, variáveis de ambiente e passo a passo para
-reproduzir em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+### CI/CD
 
-### Migração para a AWS (preparada, ainda não provisionada)
+Todo `push` ou PR para `main` roda lint e os testes de backend e frontend via
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Passando,
+o deploy é automático — e **não usa SSH**:
 
-O repositório já traz o necessário para rodar em infraestrutura própria: imagens
-Docker do backend e do frontend, um nginx que serve o site e encaminha `/api` para a
-API, e o `docker-compose.prod.yml` que amarra os dois. Nessa arquitetura o site e a
-API têm a mesma origem, o que elimina o CORS e a URL de API embutida no build — as
-duas limitações registradas no deploy atual.
+1. O *runner* assume uma role da AWS por **OIDC**; não existe chave de acesso
+   guardada no GitHub.
+2. O comando chega à instância por **AWS Systems Manager**, sem abrir porta
+   nenhuma.
+3. A instância constrói as imagens, sobe os contêineres, espera `api` e `web`
+   ficarem saudáveis e confere `/health` pela porta pública antes de declarar
+   sucesso.
+
+As migrations rodam **antes** de a API passar a escutar a porta: migration que
+falha é contêiner que nunca fica saudável, logo deploy reprovado.
+
+Provisionamento, variáveis de ambiente, custos e o procedimento manual de
+contingência em [`docs/DEPLOY_AWS.md`](docs/DEPLOY_AWS.md). Os diagramas de
+arquitetura estão em [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
+
+### Para rodar a pilha de produção localmente
 
 ```bash
 cp .env.production.example .env.production   # preencher
 npm run prod:up                              # constrói e sobe a pilha
 ```
 
-Passo a passo de EC2 + RDS, custos e alternativas avaliadas em
-[`docs/DEPLOY_AWS.md`](docs/DEPLOY_AWS.md). A Vercel continua no ar até a AWS estar
-funcionando.
+### Histórico
+
+O projeto esteve publicado na **Vercel + Neon** até a migração para a AWS. A
+disciplina passou a não aceitar hospedagem em plataformas otimizadas para
+frontend estático (Vercel, Netlify, Firebase, Render), e assumir a infraestrutura
+foi o caminho para atender à exigência. O registro da arquitetura anterior está
+preservado em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ---
 
