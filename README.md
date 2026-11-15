@@ -67,6 +67,7 @@ controlog/
 │   ├── REQUISITOS.md               # requisitos funcionais, regras de negócio, casos de uso
 │   ├── PLANO_DE_TESTES.md          # plano de testes e casos de teste principais
 │   ├── SEGURANCA.md                # análise estática, SAST e auditoria de dependências
+│   ├── OBSERVABILIDADE.md          # alarmes, painel e log no CloudWatch
 │   ├── AUDITORIA_ACESSIBILIDADE.md # auditoria WCAG 2.1 AA (RNF06)
 │   ├── DADOS_DE_DEMONSTRACAO.md    # origem da base de clientes de exemplo
 │   ├── DEPLOY_AWS.md               # deploy em vigor: EC2 + RDS, CI/CD por SSM
@@ -74,12 +75,15 @@ controlog/
 │   └── ROADMAP.md                  # funcionalidades previstas
 ├── infra/
 │   ├── cicd.yml           # CloudFormation: OIDC, role de deploy, perfil da instância
-│   └── email.yml          # CloudFormation: identidade SES, DKIM, MAIL FROM
+│   ├── email.yml          # CloudFormation: identidade SES, DKIM, MAIL FROM
+│   └── observabilidade.yml  # CloudFormation: alarmes, painel, log, health check
 ├── scripts/
 │   ├── dev.mjs            # sobe banco, API e interface com um comando só
-│   └── deploy-instancia.sh  # executado na instância pelo CI: build, sobe, verifica
+│   ├── deploy-instancia.sh  # executado na instância pelo CI: build, sobe, verifica
+│   └── metricas-instancia.sh  # cron na instância: memória, swap e disco no CloudWatch
 ├── Caddyfile                # TLS automático, HSTS, redireciona www para o apex
 ├── docker-compose.https.yml # sobreposição que põe o Caddy na frente do nginx
+├── docker-compose.logs.yml  # sobreposição opcional: log da API no CloudWatch
 ├── docker-compose.prod.yml  # pilha de produção: nginx + API (+ Postgres opcional)
 ├── .env.production.example  # modelo das variáveis de produção
 ├── package.json           # scripts da raiz (sem dependências próprias)
@@ -203,6 +207,27 @@ Os achados do CodeQL ficam em *Security → Code scanning*. O que foi
 conscientemente aceito, com o motivo e a exposição real de cada caso, está em
 [`docs/SEGURANCA.md`](docs/SEGURANCA.md) — inclusive as duas migrações de major
 ainda pendentes.
+
+---
+
+## 📊 Observabilidade
+
+CloudWatch: nove alarmes, um painel, log da API consultável no Logs Insights e
+verificação externa de `/health` pelo Route 53, tudo em
+[`infra/observabilidade.yml`](infra/observabilidade.yml).
+
+O alarme que mais importa é o de **memória**: a instância tem 913 MiB, e o build
+do frontend já foi morto por falta dela ali dentro. É também por isso que o
+monitoramento é CloudWatch e não Prometheus com Grafana — dois serviços
+residentes competiriam pela memória que falta, e o monitoramento cairia junto com
+o que deveria observar.
+
+Memória, swap e disco não são métricas nativas da EC2: vêm de
+[`scripts/metricas-instancia.sh`](scripts/metricas-instancia.sh) no cron, que é
+mais leve do que o agente do CloudWatch pelo mesmo motivo.
+
+Como subir, como verificar e o custo de cada item em
+[`docs/OBSERVABILIDADE.md`](docs/OBSERVABILIDADE.md).
 
 ---
 

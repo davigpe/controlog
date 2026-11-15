@@ -137,6 +137,37 @@ Resources:
                 # existir nesta conta.
                 Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${DominioDeEmail}'
 
+        # O AmazonSSMManagedInstanceCore nao cobre nada disto: ele da acesso aos
+        # canais do SSM, nao ao CloudWatch. Sem estas duas permissoes o driver
+        # awslogs do Docker e o scripts/metricas-instancia.sh falham, e falham
+        # de forma discreta: o contêiner sobe e o log simplesmente nao aparece.
+        - PolicyName: publicar-observabilidade
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EscreverNoLogDaAplicacao
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                # Restrito ao grupo da aplicacao, criado pela stack de
+                # observabilidade. A instancia nao escreve em outro log group da
+                # conta, e nao tem logs:CreateLogGroup: se o grupo nao existir,
+                # e porque a stack nao subiu, e o certo e falhar e nao criar um
+                # grupo sem retencao definida.
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/controlog/aplicacao:*'
+
+              - Sid: PublicarMetricasDaInstancia
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                # PutMetricData nao aceita restricao por recurso; o controle
+                # possivel e por namespace.
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: Controlog/Instancia
+
   PerfilSsmDaInstancia:
     Type: AWS::IAM::InstanceProfile
     Properties:

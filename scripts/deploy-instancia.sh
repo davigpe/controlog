@@ -20,7 +20,18 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 LOG=/tmp/controlog-deploy.log
-COMPOSE=(docker compose -f docker-compose.prod.yml -f docker-compose.https.yml --env-file .env.production)
+ARQUIVOS=(-f docker-compose.prod.yml -f docker-compose.https.yml)
+
+# Envio de log para o CloudWatch, opt-in por variavel no .env.production. Fica
+# numa sobreposicao separada porque o driver awslogs impede o contêiner de subir
+# quando o grupo de log nao existe: ligado por engano num ambiente sem a stack
+# de observabilidade, derrubaria o deploy.
+if [[ -f .env.production ]] && grep -qE '^CONTROLOG_LOGS_CLOUDWATCH=1[[:space:]]*$' .env.production; then
+  ARQUIVOS+=(-f docker-compose.logs.yml)
+  echo '==> log da API sera enviado ao CloudWatch'
+fi
+
+COMPOSE=(docker compose "${ARQUIVOS[@]}" --env-file .env.production)
 
 falhar() {
   echo "FALHOU: $1"
