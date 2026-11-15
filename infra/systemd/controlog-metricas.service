@@ -1,0 +1,31 @@
+[Unit]
+# Publica memoria, swap e disco da instancia no CloudWatch.
+#
+# Unidade de systemd, e nao linha de crontab, por dois motivos. O primeiro e
+# pratico: o Amazon Linux 2023 nao traz o cronie instalado, e `crontab` responde
+# "command not found". O segundo e que instalar o cronie acrescentaria um daemon
+# residente nesta instancia de 913 MiB, exatamente o recurso que estas metricas
+# existem para vigiar. O systemd ja esta aqui como PID 1.
+Description=Publica metricas da instancia Controlog no CloudWatch
+Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDADE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/controlog-metricas
+
+# A credencial vem do instance profile, pelo metadata; nao ha chave em lugar
+# nenhum. A regiao e explicita para o caso de a unidade rodar sem o ambiente do
+# shell, onde AWS_REGION nao estaria definida.
+Environment=AWS_REGION=us-east-1
+
+# Roda como ec2-user, e nao root: o script so le /proc e chama a API da AWS.
+User=ec2-user
+
+# Se a rede ou a API falhar, a execucao seguinte tenta de novo em cinco
+# minutos. Nao faz sentido insistir dentro da mesma execucao.
+TimeoutStartSec=60
+
+[Install]
+WantedBy=multi-user.target
