@@ -1,0 +1,26 @@
+[Unit]
+Description=Dispara a publicacao de metricas do Controlog a cada cinco minutos
+Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDADE.md
+
+[Timer]
+# Cinco minutos para casar com o periodo dos alarmes de memoria e disco, que
+# avaliam dois periodos de 300 s. Intervalo maior deixaria o alarme em
+# INSUFFICIENT_DATA entre as publicacoes.
+OnUnitActiveSec=5min
+
+# Primeira execucao um minuto depois da subida, e nao imediatamente: da tempo de
+# a rede ficar pronta e evita medir a maquina no pico do boot, que nao
+# representa o estado normal.
+OnBootSec=1min
+
+# Espalha o disparo em ate 30 s. Sem isso, toda publicacao cairia no mesmo
+# segundo do minuto — irrelevante com uma instancia, mas e o padrao certo e
+# custa nada.
+RandomizedDelaySec=30
+
+# Se a instancia estiver desligada na hora do disparo, executa na volta em vez
+# de pular. E o que o cron nao faz.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -6,15 +6,20 @@
 # disco do volume, mas nao ve dentro do sistema operacional. Memoria em uso e
 # espaco livre em disco so saem de dentro.
 #
-# E um script no cron, e nao o agente do CloudWatch, de proposito: nesta
-# instancia a memoria e o recurso escasso — 913 MiB, e o build do frontend ja
-# foi morto por falta dela aqui — e um agente residente consumiria parte
+# E um script disparado por timer, e nao o agente do CloudWatch, de proposito:
+# nesta instancia a memoria e o recurso escasso — 913 MiB, e o build do frontend
+# ja foi morto por falta dela aqui — e um agente residente consumiria parte
 # justamente do que precisa ser medido. Este script sobe, publica tres valores
 # e sai.
 #
 # Instalacao, na instancia:
 #   sudo install -m 755 scripts/metricas-instancia.sh /usr/local/bin/controlog-metricas
-#   ( crontab -l 2>/dev/null; echo '*/5 * * * * /usr/local/bin/controlog-metricas' ) | crontab -
+#   sudo install -m 644 infra/systemd/controlog-metricas.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now controlog-metricas.timer
+#
+# Timer do systemd e nao crontab: o Amazon Linux 2023 nao traz o cronie
+# instalado, e instalar um daemon residente aqui contrariaria o motivo de este
+# script existir.
 #
 # A credencial vem do instance profile; nao ha chave em lugar nenhum. A
 # permissao cloudwatch:PutMetricData esta na role controlog-ec2-ssm, definida em
