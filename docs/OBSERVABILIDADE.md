@@ -105,6 +105,24 @@ O log do nginx fica de fora. Ele registra toda requisição de arquivo estático
 que seria a maior parte do volume e quase nenhum sinal. Para investigar o proxy,
 `docker compose logs web` continua disponível na instância.
 
+### `/health` bem-sucedido também fica de fora
+
+Medido com o log já funcionando: o *health check* do Route 53 consulta `/health`
+a cada 30 s **de vários verificadores em regiões diferentes** — oito endereços
+distintos apareceram em poucos segundos — e o `healthcheck` do contêiner
+acrescenta o seu. Juntos, eram praticamente todo o conteúdo do grupo de log.
+
+Isso custa ingestão para registrar que está tudo bem, e afoga o que importa: a
+consulta de erros e o widget do painel ficam cheios de linhas 200 do verificador.
+O morgan agora dispensa `/health` quando a resposta é abaixo de 400:
+
+```js
+skip: (req, res) => req.path === '/health' && res.statusCode < 400,
+```
+
+**Falha continua registrada.** Um `/health` respondendo 503 é exatamente o que se
+quer ver no log, e passa pelo filtro.
+
 ### O formato do log é pré-requisito, não detalhe
 
 Fora de desenvolvimento a API usa o formato **`combined`** do morgan. Antes usava
