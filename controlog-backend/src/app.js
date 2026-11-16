@@ -38,7 +38,19 @@ export function createApp() {
     // impossível de filtrar: o padrão de métrica que conta respostas 5xx e as
     // consultas do Logs Insights em docs/OBSERVABILIDADE.md extraem método,
     // rota e status do formato `combined`.
-    app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
+    app.use(
+      morgan(env.nodeEnv === 'development' ? 'dev' : 'combined', {
+        // `/health` bem-sucedido não vai para o log. Ele é consultado pelo
+        // health check do Route 53 a cada 30 s, de vários verificadores em
+        // regiões diferentes, e pelo healthcheck do contêiner — juntos, a maior
+        // parte do volume e nenhum sinal. No CloudWatch isso afoga o que
+        // importa e cobra ingestão para registrar que está tudo bem.
+        //
+        // Falha continua registrada: o filtro só dispensa resposta abaixo de
+        // 400. Um `/health` respondendo 503 é exatamente o que se quer ver.
+        skip: (req, res) => req.path === '/health' && res.statusCode < 400,
+      })
+    );
   }
 
   // RNF04 — proteção básica contra abuso, mantendo a API disponível para os
