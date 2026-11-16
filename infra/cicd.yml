@@ -158,6 +158,30 @@ Resources:
                 # grupo sem retencao definida.
                 Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/controlog/aplicacao:*'
 
+              - Sid: LerASenhaRotacionadaDoBanco
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                # Restrito aos segredos gerenciados pelo proprio RDS, que sao os
+                # unicos com o prefixo `rds!db-`. A instancia nao alcanca nenhum
+                # outro segredo que venha a existir nesta conta.
+                #
+                # Necessario porque o banco usa senha mestra gerenciada pela
+                # AWS, com rotacao a cada 7 dias. Sem isto, a cada rotacao a
+                # credencial do .env.production fica velha e todo acesso ao
+                # banco passa a responder 500 — foi o que aconteceu em
+                # 16/11/2026, com cinco horas de login quebrado.
+                Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:rds!db-*'
+
+              - Sid: DescobrirOSegredoDoBanco
+                Effect: Allow
+                # Para o script achar o ARN do segredo a partir da instancia de
+                # banco, em vez de ter o ARN fixo em arquivo. describe nao
+                # devolve segredo nenhum.
+                Action: rds:DescribeDBInstances
+                Resource: '*'
+
               - Sid: PublicarMetricasDaInstancia
                 Effect: Allow
                 Action: cloudwatch:PutMetricData

@@ -114,9 +114,13 @@ DOMINIO="${DOMINIO//\"/}"      # o valor vem entre aspas no .env
 DOMINIO="${DOMINIO//\'/}"
 DOMINIO="${DOMINIO//[[:space:]]/}"
 if [[ -n "$DOMINIO" ]]; then
-  echo "==> conferindo https://${DOMINIO}/health"
-  curl -fsS --max-time 20 "https://${DOMINIO}/health" >/dev/null \
-    || falhar "a aplicacao nao respondeu em https://${DOMINIO}/health"
+  # /health/db e nao /health: o primeiro consulta o banco, o segundo so prova
+  # que o processo subiu. Um deploy que publica uma aplicacao incapaz de falar
+  # com o banco nao deve passar — foi assim que a rotacao da senha do RDS ficou
+  # cinco horas sem ser notada.
+  echo "==> conferindo https://${DOMINIO}/health/db"
+  curl -fsS --max-time 20 "https://${DOMINIO}/health/db" >/dev/null \
+    || falhar "a aplicacao nao respondeu em https://${DOMINIO}/health/db (banco inacessivel?)"
 fi
 
 echo "==> limpando imagens e cache orfaos"
