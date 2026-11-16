@@ -118,9 +118,17 @@ if [[ -n "$DOMINIO" ]]; then
   # que o processo subiu. Um deploy que publica uma aplicacao incapaz de falar
   # com o banco nao deve passar — foi assim que a rotacao da senha do RDS ficou
   # cinco horas sem ser notada.
+  # Confere o CORPO, e nao so o codigo. Com `location = /health` no nginx, o
+  # caminho /health/db nao casava regra nenhuma, caia no try_files e recebia o
+  # index.html da SPA com 200 — a verificacao passava sem a API ter sido
+  # consultada. Exigir "banco":"ok" fecha esse falso positivo: HTML nao casa.
   echo "==> conferindo https://${DOMINIO}/health/db"
-  curl -fsS --max-time 20 "https://${DOMINIO}/health/db" >/dev/null \
-    || falhar "a aplicacao nao respondeu em https://${DOMINIO}/health/db (banco inacessivel?)"
+  RESPOSTA=$(curl -fsS --max-time 20 "https://${DOMINIO}/health/db" 2>/dev/null) \
+    || falhar "a aplicacao nao respondeu em https://${DOMINIO}/health/db"
+  case "$RESPOSTA" in
+    *'"banco":"ok"'*) : ;;
+    *) falhar "https://${DOMINIO}/health/db respondeu sem \"banco\":\"ok\" — banco inacessivel, ou a rota caiu no fallback da SPA" ;;
+  esac
 fi
 
 echo "==> limpando imagens e cache orfaos"
