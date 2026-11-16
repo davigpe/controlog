@@ -1,5 +1,5 @@
 [Unit]
-Description=Verifica a cada cinco minutos se a senha do banco foi rotacionada
+Description=Verifica a cada minuto se a senha do banco foi rotacionada
 Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDADE.md
 
 [Timer]
@@ -9,16 +9,29 @@ Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDAD
 # justamente depois da primeira falha. Aqui isso seria pior ainda: a falha que
 # mais importa e exatamente a que acontece quando a senha acabou de mudar.
 #
-# Cinco minutos define a pior janela de indisponibilidade depois de uma
-# rotacao. Rotacao e a cada 7 dias, entao o custo de verificar e irrisorio
-# comparado ao de ficar fora do ar.
-OnCalendar=*:0/5
+# A cada minuto. O intervalo define a pior janela de indisponibilidade depois
+# de uma rotacao, e o numero saiu de um teste real, nao de estimativa: com
+# cinco minutos, uma rotacao forcada em 16/11/2026 deixou o sistema fora por
+# 5 min e 3 s, enquanto o alarme de disponibilidade levou 4 min e 47 s para
+# disparar. Ou seja, o e-mail de alerta chegava junto com o problema ja
+# resolvido — ruido sem utilidade.
+#
+# Com um minuto, a recuperacao acontece ANTES de o alarme disparar, que exige
+# dois pontos de 60 s mais o atraso da metrica do Route 53. O alarme passa a
+# ser o que deve ser: sinal de que a recuperacao automatica falhou.
+#
+# Custo: uma chamada ao Secrets Manager por minuto, cerca de 43 mil por mes, a
+# US$ 0,05 por 10 mil — aproximadamente US$ 0,22 mensais. Nao e nivel gratuito;
+# e barato.
+OnCalendar=*:*:00
 
 # Executa na volta se a instancia estiver desligada na hora do disparo. So tem
 # efeito com OnCalendar.
 Persistent=true
 
-RandomizedDelaySec=30
+# Cinco segundos, e nao trinta: com disparo a cada minuto, uma dispersao de
+# meio minuto seria metade do intervalo.
+RandomizedDelaySec=5
 
 [Install]
 WantedBy=timers.target
