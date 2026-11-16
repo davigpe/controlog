@@ -581,8 +581,8 @@ força uma rotação estão em [OBSERVABILIDADE.md](OBSERVABILIDADE.md#3-a-senha
 
 ### Nunca dois deploys ao mesmo tempo
 
-O script começa pegando uma trava (`flock -n` em `/tmp/controlog-deploy.lock`) e
-**recusa na hora** se já houver um deploy em andamento.
+O script começa pegando uma trava (`flock` em `/tmp/controlog-deploy.lock`) e
+**espera até 120 s**; se a trava não for liberada nesse prazo, ele recusa.
 
 Isso não é precaução teórica. Um deploy feito à mão por SSH rodou junto com o do
 CI por SSM, e o resultado foi **cerca de 25 horas de indisponibilidade**:
@@ -598,9 +598,25 @@ CI por SSM, e o resultado foi **cerca de 25 horas de indisponibilidade**:
 O `concurrency` do workflow não cobre isso: ele impede dois deploys do GitHub
 Actions e não vê nada que rode na mão na instância.
 
-A trava usa `-n` (recusa) em vez de esperar: um deploy pendurado atrás de outro
-estouraria o tempo do SSM e reprovaria igual, só mais devagar e sem dizer por
-quê.
+**Por que espera, e por que 120 s.** A primeira versão usava `-n` (recusa
+imediata), raciocinando apenas sobre a disputa deploy-contra-deploy: ali recusar
+rápido é melhor que pendurar até estourar o tempo do SSM. O que faltou foi o
+terceiro disputante.
+
+O `controlog-senha-banco.service` pega a **mesma** trava, de propósito, e com
+`-n` um deploy legítimo podia ser reprovado por perder a corrida para ele. Foi o
+que aconteceu no deploy da 1.11.7, em 16/11/2026: `FALHOU: ja existe um deploy
+em andamento nesta instancia`, sem nenhum outro deploy existindo. A 1.11.6 havia
+quintuplicado a chance disso ao levar aquele timer de 5 min para 1 min, e o
+script, na época, segurava a trava do início ao fim de cada tique — cerca de 2 s
+por minuto, ou ~3% do tempo.
+
+A correção foi dos dois lados: o script de senha passou a tomar a trava só
+depois das chamadas à AWS, quando realmente vai mexer em arquivo e contêiner, e
+o deploy passou a esperar. 120 s cobre com folga qualquer disputa com ele e
+ainda reprova bem antes dos 700 s que o workflow passa consultando o SSM — então
+contra um deploy concorrente de verdade a mensagem continua chegando, só 2 min
+depois.
 
 **Antes de rodar o script à mão**, confirme que não há nada em andamento:
 

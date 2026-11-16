@@ -148,6 +148,15 @@ um deploy constrói imagens é precisamente a corrida que derrubou a produção 
 25 horas. Com `flock -n`, se houver deploy em andamento o tique desiste e o
 próximo tenta de novo.
 
+> **Mas só depois de ler o segredo.** A trava é tomada no meio do script, não no
+> começo, e isso é deliberado. Praticamente todo o tempo de um tique está nas
+> duas chamadas à AWS (~2 s de parede contra ~50 ms de reescrita), e nenhuma
+> delas toca em contêiner ou arquivo. Segurando a trava do início ao fim, o
+> script a ocupava ~2 s por minuto — e **reprovou um deploy de verdade** em
+> 16/11/2026, logo depois de o intervalo cair de 5 min para 1 min. Agora a trava
+> só é ocupada quando a senha mudou de fato: uma vez por semana. Do outro lado,
+> o deploy passou a esperar até 120 s em vez de recusar na hora.
+
 **A senha nunca aparece em log nem em linha de comando.** Ela trafega por
 variável de shell e por *stdin*; argumento de processo seria visível em `ps` para
 qualquer usuário da máquina. O script imprime apenas `inalterado` ou
