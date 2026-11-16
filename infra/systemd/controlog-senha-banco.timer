@@ -33,5 +33,21 @@ Persistent=true
 # meio minuto seria metade do intervalo.
 RandomizedDelaySec=5
 
+# Um segundo, e nao o padrao. Este campo e quanto o systemd pode ATRASAR o
+# disparo para agrupar despertares e economizar energia, e o padrao e 1 minuto
+# — do tamanho do intervalo inteiro deste timer.
+#
+# Nao e teoria. Medido na instancia em 16/11/2026, com o padrao em vigor
+# (`AccuracyUSec=1min`), quatro disparos consecutivos sairam as 13:33:06,
+# 13:34:59, 13:35:59 e 13:36:06: nenhum no segundo zero, intervalos de 7 s a
+# 1 min 53 s. Cada slot de minuto disparava em algum ponto dentro da sua
+# janela de um minuto, o que levava a pior janela de indisponibilidade de
+# ~1 min para ~2 min — metade do ganho da versao anterior, perdido num campo
+# que eu nao havia definido.
+#
+# O custo e um despertar por minuto que nao pode ser agrupado com outros.
+# Numa instancia que ja roda Docker e um timer de metricas, e irrelevante.
+AccuracySec=1s
+
 [Install]
 WantedBy=timers.target

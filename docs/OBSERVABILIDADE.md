@@ -107,7 +107,22 @@ disparado por timer do systemd a cada minuto:
    declarar sucesso.
 
 **A pior janela de indisponibilidade é o intervalo do timer**: cerca de um minuto
-entre a rotação e a correção.
+e meio entre a rotação e a correção — o minuto do `OnCalendar`, mais até cinco
+segundos de `RandomizedDelaySec`, mais os poucos segundos de recriação do
+contêiner.
+
+> **`AccuracySec` não é detalhe.** Na primeira versão do timer de um minuto eu
+> não defini esse campo, e o padrão do systemd é **1 minuto** — ele é a margem
+> pela qual o systemd pode *atrasar* o disparo para agrupar despertares. Num
+> timer de um minuto, isso dobrava a janela. Medido na instância em 16/11/2026,
+> com o padrão em vigor: disparos às 13:33:06, 13:34:59, 13:35:59 e 13:36:06,
+> nenhum no segundo zero, com intervalos de 7 s a **1 min 53 s**. Hoje o timer
+> declara `AccuracySec=1s`.
+>
+> O timer de métricas **não** precisa disso: lá o jitter máximo é 90 s (30 s de
+> `RandomizedDelaySec` mais 60 s de `AccuracySec`) contra um período de alarme
+> de 300 s, então cada disparo cai sempre dentro do seu próprio período e
+> nenhum fica sem datapoint.
 
 O intervalo saiu de medição, não de estimativa. Com cinco minutos, uma rotação
 forçada em 16/11/2026 deixou o sistema fora por **5 min e 3 s**, enquanto o
@@ -437,7 +452,7 @@ detecta, recria a `api`, e volta a `"banco":"ok"` sem ninguém intervir. O
 `journalctl -u controlog-senha-banco` registra `alterado`.
 
 > Faça isso quando puder acompanhar. A rotação é real e a janela de
-> indisponibilidade também — cerca de um minuto.
+> indisponibilidade também — cerca de um minuto e meio.
 
 ## Documentos relacionados
 
