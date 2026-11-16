@@ -26,14 +26,30 @@
 
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+# Diretorio do projeto por caminho configuravel, e NAO derivado de
+# $BASH_SOURCE. Este script e instalado em /usr/local/bin, e dali
+# `dirname $BASH_SOURCE`/.. resolve para /usr/local — onde nao existe
+# .env.production. O script falhava com "nao existe neste diretorio" tanto na
+# execucao manual quanto sob o systemd, porque o `cd` sobrepunha o
+# WorkingDirectory da unidade.
+#
+# Rodando a partir do proprio repositorio, o caminho padrao continua valendo.
+DIRETORIO_PROJETO="${CONTROLOG_DIR:-/home/ec2-user/controlog}"
+
+if [[ ! -d "$DIRETORIO_PROJETO" ]]; then
+  echo "FALHOU: diretorio do projeto nao encontrado em $DIRETORIO_PROJETO."
+  echo 'Defina CONTROLOG_DIR se o projeto estiver em outro lugar.'
+  exit 1
+fi
+
+cd "$DIRETORIO_PROJETO"
 
 REGIAO="${AWS_REGION:-us-east-1}"
 ENV_ARQUIVO=.env.production
 ID_DO_BANCO="${CONTROLOG_DB_ID:-controlog-db}"
 
 if [[ ! -f "$ENV_ARQUIVO" ]]; then
-  echo "FALHOU: $ENV_ARQUIVO nao existe neste diretorio."
+  echo "FALHOU: $ENV_ARQUIVO nao existe em $DIRETORIO_PROJETO."
   exit 1
 fi
 
@@ -156,15 +172,42 @@ fi
 
 docker compose "${ARQUIVOS[@]}" --env-file "$ENV_ARQUIVO" up -d --force-recreate api
 
+# Em seguida, um `up -d` da pilha inteira. No caso normal — site no ar, senha
+# rotacionada — nao faz nada, porque web e caddy ja estao rodando. Mas se a
+# senha velha tiver impedido o `api` de subir num deploy anterior, `web` e
+# `caddy` ficaram parados tambem, por dependerem dele: sem esta linha o script
+# consertaria a senha e deixaria o site fora do ar.
+docker compose "${ARQUIVOS[@]}" --env-file "$ENV_ARQUIVO" up -d
+
 # Confirma que a api voltou a falar com o banco. Sem esta checagem, o script
 # diria "pronto" mesmo tendo escrito uma senha que nao funciona.
+#
+# Pelo dominio em HTTPS, e nao por http://127.0.0.1: a porta 80 da instancia e
+# o Caddy, que responde 308 redirecionando para HTTPS — o curl aceitaria o 308
+# sem erro e a checagem passaria sem nunca ter falado com a API.
+DOMINIO=$(grep -m1 '^CONTROLOG_DOMAIN=' "$ENV_ARQUIVO" | cut -d= -f2-)
+DOMINIO="${DOMINIO//\"/}"
+DOMINIO="${DOMINIO//\'/}"
+DOMINIO="${DOMINIO//[[:space:]]/}"
+
+if [[ -z "$DOMINIO" ]]; then
+  echo 'api recriada; sem CONTROLOG_DOMAIN no .env, nao foi possivel conferir /health/db.'
+  exit 0
+fi
+
 for _ in $(seq 1 30); do
-  if curl -fsS --max-time 5 http://127.0.0.1/health/db >/dev/null 2>&1; then
-    echo 'api recriada e com o banco acessivel.'
-    exit 0
-  fi
+  # Confere o CORPO e nao so o codigo: se a rota cair no fallback da SPA, a
+  # resposta e o index.html com 200, e a checagem passaria sem ter consultado
+  # o banco.
+  RESPOSTA=$(curl -fsS --max-time 5 "https://${DOMINIO}/health/db" 2>/dev/null || true)
+  case "$RESPOSTA" in
+    *'"banco":"ok"'*)
+      echo 'api recriada e com o banco acessivel.'
+      exit 0
+      ;;
+  esac
   sleep 2
 done
 
-echo 'FALHOU: a api subiu mas /health/db nao respondeu com o banco acessivel.'
+echo 'FALHOU: a api subiu mas /health/db nao confirmou o banco acessivel.'
 exit 1

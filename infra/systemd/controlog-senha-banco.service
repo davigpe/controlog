@@ -14,10 +14,14 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/bin/controlog-senha-banco
 
-# Precisa rodar no diretorio do projeto: o script resolve .env.production e os
-# arquivos de compose a partir do proprio caminho, mas o `docker compose`
-# precisa do diretorio para derivar o nome do projeto. Nome de projeto
-# diferente criaria um segundo conjunto de conteineres em vez de recriar a api.
+# Onde o projeto vive. O script usa esta variavel para achar o
+# .env.production e os arquivos de compose — e nao o proprio caminho, porque
+# instalado em /usr/local/bin ele resolveria para /usr/local.
+Environment=CONTROLOG_DIR=/home/ec2-user/controlog
+
+# O mesmo diretorio tambem como WorkingDirectory: o `docker compose` deriva o
+# nome do projeto do diretorio, e nome diferente criaria um segundo conjunto de
+# conteineres em vez de recriar a api.
 WorkingDirectory=/home/ec2-user/controlog
 
 Environment=AWS_REGION=us-east-1
