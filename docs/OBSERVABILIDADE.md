@@ -258,6 +258,30 @@ systemctl list-timers controlog-metricas.timer
 > disparo, e `journalctl -u controlog-metricas` dá o histórico de execução, que o
 > cron não dá.
 
+**Confira que o `list-timers` mostra um próximo disparo.** O esperado é algo como:
+
+```
+NEXT                        LEFT     LAST  PASSED  UNIT
+Mon 2026-11-16 03:25:00 UTC 2min ...  ...   ...     controlog-metricas.timer
+```
+
+`NEXT -` e `LEFT -` significam **timer sem próximo disparo agendado**, e foi o que
+aconteceu na primeira versão: ela usava `OnUnitActiveSec=5min`, que ancora o
+próximo disparo na última *ativação* do serviço — e um `Type=oneshot` que falha
+não registra ativação. O serviço falhou na primeira execução e o timer ficou
+parado para sempre, ou seja, o monitoramento morria junto com a primeira falha,
+exatamente quando precisava continuar tentando.
+
+Hoje o timer usa `OnCalendar=*:0/5`, que é absoluto: dispara nos minutos 0, 5,
+10… de toda hora, independentemente de a execução anterior ter dado certo. Como
+efeito colateral, o `Persistent=true` passou a valer — ele só tem efeito com
+`OnCalendar`, e em timer monotônico o systemd o ignora.
+
+Se a execução manual falhar com `ParamValidation` em `Dimensions`, o script na
+instância é anterior à 1.11.3: em `--metric-data`, `Dimensions` é uma lista de
+estruturas, e a sintaxe abreviada `Dimensions=InstanceId=…` é recusada. O script
+usa JSON por isso.
+
 ### 4. O envio de log, quando quiser ligar
 
 ```bash
