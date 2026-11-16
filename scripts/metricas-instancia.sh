@@ -66,12 +66,38 @@ swap_percentual=$(awk -v t="$swap_total" -v l="$swap_livre" \
 # Particao raiz, que e onde moram as imagens Docker e o volume de comprovantes.
 disco_percentual=$(df --output=pcent / | tail -1 | tr -d ' %')
 
+# JSON, e nao a sintaxe abreviada `Chave=valor`. Em `--metric-data`, Dimensions
+# e uma lista de estruturas, e a abreviacao exigiria
+# `Dimensions=[{Name=...,Value=...}]`. Escrito como `Dimensions=InstanceId=...`,
+# o CLI recusa com:
+#   Invalid type for parameter MetricData[0].Dimensions[0] ... valid types: dict
+# O JSON nao tem essa ambiguidade e e legivel.
 aws cloudwatch put-metric-data \
   --region "$REGIAO" \
   --namespace "$NAMESPACE" \
-  --metric-data \
-    "MetricName=MemoriaUtilizadaPercentual,Value=$mem_percentual,Unit=Percent,Dimensions=InstanceId=$id_da_instancia" \
-    "MetricName=SwapUtilizadoPercentual,Value=$swap_percentual,Unit=Percent,Dimensions=InstanceId=$id_da_instancia" \
-    "MetricName=DiscoUtilizadoPercentual,Value=$disco_percentual,Unit=Percent,Dimensions=InstanceId=$id_da_instancia"
+  --metric-data "$(
+    cat <<JSON
+[
+  {
+    "MetricName": "MemoriaUtilizadaPercentual",
+    "Value": $mem_percentual,
+    "Unit": "Percent",
+    "Dimensions": [{ "Name": "InstanceId", "Value": "$id_da_instancia" }]
+  },
+  {
+    "MetricName": "SwapUtilizadoPercentual",
+    "Value": $swap_percentual,
+    "Unit": "Percent",
+    "Dimensions": [{ "Name": "InstanceId", "Value": "$id_da_instancia" }]
+  },
+  {
+    "MetricName": "DiscoUtilizadoPercentual",
+    "Value": $disco_percentual,
+    "Unit": "Percent",
+    "Dimensions": [{ "Name": "InstanceId", "Value": "$id_da_instancia" }]
+  }
+]
+JSON
+  )"
 
 echo "metricas publicadas: memoria ${mem_percentual}%, swap ${swap_percentual}%, disco ${disco_percentual}%"
