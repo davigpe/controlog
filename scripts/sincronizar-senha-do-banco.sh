@@ -60,16 +60,6 @@ for comando in aws python3 flock; do
   }
 done
 
-# A mesma trava do deploy, de proposito. Recriar o conteiner da api enquanto um
-# deploy constroi imagens e exatamente a corrida que derrubou a producao por 25
-# horas. Com -n, se houver deploy em andamento este tique desiste e o proximo,
-# em um minuto, tenta de novo.
-exec {FD_TRAVA}>/tmp/controlog-deploy.lock
-if ! flock -n "$FD_TRAVA"; then
-  echo 'deploy em andamento; pulando esta verificacao.'
-  exit 0
-fi
-
 # ARN descoberto a partir da instancia de banco, em vez de fixo em arquivo: o
 # ARN de segredo gerenciado pelo RDS termina num sufixo aleatorio, e ele muda se
 # o banco for recriado.
@@ -94,6 +84,26 @@ SEGREDO=$(
     --query SecretString \
     --output text
 )
+
+# A mesma trava do deploy, de proposito. Recriar o conteiner da api enquanto um
+# deploy constroi imagens e exatamente a corrida que derrubou a producao por 25
+# horas. Com -n, se houver deploy em andamento este tique desiste e o proximo,
+# em um minuto, tenta de novo.
+#
+# Tomada AQUI, e nao no inicio do script, por causa de um deploy reprovado de
+# verdade em 16/11/2026: `FALHOU: ja existe um deploy em andamento nesta
+# instancia`, com o deploy perdendo a trava para este script. Quase todo o
+# tempo de execucao de um tique esta nas duas chamadas a AWS acima — cerca de
+# 2 s de parede, para ~50 ms de reescrita — e nenhuma delas toca em conteiner
+# ou arquivo, logo nenhuma precisa de exclusao mutua. Segurando a trava do
+# inicio ao fim, este script a ocupava ~2 s por minuto depois da 1.11.6, ou
+# seja ~3% do tempo; dali para frente ela so e ocupada quando a senha mudou
+# de fato, uma vez por semana.
+exec {FD_TRAVA}>/tmp/controlog-deploy.lock
+if ! flock -n "$FD_TRAVA"; then
+  echo 'deploy em andamento; pulando esta verificacao.'
+  exit 0
+fi
 
 # O Python faz a troca inteira: le o segredo do stdin, reescreve as duas URLs do
 # arquivo preservando host, porta, base e parametros, e imprime apenas
