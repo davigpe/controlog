@@ -7,12 +7,13 @@ descobrir.
 
 | Camada | Onde | Responde |
 |---|---|---|
-| Verificação externa | Route 53 *health check* em `https://controlog.app/health`, a cada 30 s | O site está no ar para quem acessa? |
+| Verificação externa | Route 53 *health check* em `https://controlog.app/health/db`, a cada 30 s | A aplicação consegue atender, banco incluído? |
 | Métrica de aplicação | Filtro de métrica sobre o log: respostas 5xx | A aplicação está quebrada para o usuário? |
 | Métricas da instância | CloudWatch, nativas (CPU, *status check*) e customizadas (memória, swap, disco) | A máquina está no limite? |
 | Métricas do banco | CloudWatch, nativas do RDS | O banco está no limite? |
 | Log investigável | CloudWatch Logs, grupo `/controlog/aplicacao` | O que aconteceu, exatamente? |
 | Notificação | Tópico SNS `controlog-alertas`, por e-mail | Alguém fica sabendo |
+| Sincronia da senha do banco | Timer do systemd, a cada 5 min | A credencial do banco ainda é a atual depois da rotação? |
 
 Tudo em CloudFormation, em [`infra/observabilidade.yml`](../infra/observabilidade.yml).
 
@@ -42,16 +43,36 @@ da instância.
 | `controlog-rds-espaco-baixo` | Espaço livre < 2 GB | São 10% dos 20 GB alocados. Banco sem espaço recusa escrita, e o sintoma na tela é erro em qualquer cadastro |
 | `controlog-rds-conexoes-altas` | Conexões > 40 por 10 min | O `max_connections` é a fórmula padrão `LEAST({DBInstanceClassMemory/9531392},5000)`, lida do *parameter group* `default.postgres16`, que na `db.t4g.micro` de 1 GiB resulta em algo em torno de 100. 40 é aviso antecipado; conexão vazando é a causa mais comum de chegar lá |
 | `controlog-app-erros-5xx` | Mais de 5 respostas 5xx em 5 min | Diferente dos alarmes de recurso, mede o que o usuário sente |
-| `controlog-site-fora-do-ar` | `/health` deixa de responder 2× | Verificação de **fora** da AWS |
+| `controlog-site-fora-do-ar` | `/health/db` deixa de responder 2× | Verificação de **fora** da AWS, e a única que prova que a aplicação consegue trabalhar |
 
 Nove alarmes cabem no nível gratuito do CloudWatch, que cobre dez.
 
 ### Duas decisões nos alarmes que valem explicação
 
-**`/health`, e não a raiz, na verificação externa.** A raiz devolve o HTML da SPA,
-servido pelo nginx a partir de arquivos estáticos — ela continuaria respondendo
-200 com a API completamente fora. `/health` passa pela API, então mede o que
-interessa.
+**`/health/db`, e não `/health` nem a raiz, na verificação externa.** Os três
+respondem coisas diferentes, e a diferença custou cinco horas de
+indisponibilidade:
+
+| Endereço | O que prova | O que **não** prova |
+|---|---|---|
+| `/` | O nginx está servindo arquivos | Nada sobre a API — responde 200 com a API inteira fora |
+| `/health` | O processo da API subiu e responde | Nada sobre o banco |
+| `/health/db` | A API consegue autenticar e consultar o banco | — |
+
+> **O incidente.** Em 16/11/2026 a rotação automática da senha mestra do RDS
+> invalidou a credencial do `.env.production`. Todo login passou a responder
+> **500** — e o `/health`, que era o endereço desta verificação, seguiu
+> devolvendo 200, porque não tocava em dependência nenhuma. O alarme ficou em
+> `OK` por cinco horas e quem descobriu a queda foi o usuário tentando entrar.
+>
+> O alarme de 5xx também não pegou: o limite é mais de 5 respostas 5xx em 5
+> minutos, e com pouco tráfego três tentativas de login não chegam lá. Medir
+> *liveness* responde "o processo está vivo?". A pergunta que importa é "ele
+> consegue atender?", e essa exige falar com o banco.
+
+`/health` continua existindo e continua sendo o que o `healthcheck` do contêiner
+consulta — ali é certo medir só liveness, porque um banco momentaneamente
+indisponível não significa contêiner quebrado e não deve marcá-lo como tal.
 
 **`TreatMissingData` é diferente em cada alarme, de propósito.** Ausência de dado
 significa coisas opostas: no *status check* da EC2 significa instância
@@ -59,7 +80,54 @@ inacessível (`breaching`); nas métricas customizadas significa que o cron aind
 não rodou (`missing`, para não disparar ruído logo depois da stack subir); na CPU
 significa máquina ociosa (`notBreaching`).
 
-## 3. Memória e disco: por que um script, e não o agente
+## 3. A senha do banco rotaciona sozinha
+
+O RDS usa **senha mestra gerenciada pela AWS**: ela vive no Secrets Manager, num
+segredo `rds!db-…` de propriedade do serviço `rds`, com **rotação automática a
+cada 7 dias**.
+
+Isso é bom para segurança e incompatível com senha escrita em arquivo. A cada
+rotação, o `DATABASE_URL` do `.env.production` fica velho e **todo acesso ao
+banco passa a responder 500** — foi exatamente o incidente descrito acima.
+
+A ponte é
+[`scripts/sincronizar-senha-do-banco.sh`](../scripts/sincronizar-senha-do-banco.sh),
+disparado por timer do systemd a cada cinco minutos:
+
+1. Descobre o ARN do segredo a partir da instância de banco
+   (`MasterUserSecret.SecretArn`), em vez de tê-lo fixo em arquivo — o sufixo do
+   ARN é aleatório e muda se o banco for recriado.
+2. Lê o segredo usando a credencial do *instance profile*. Nenhuma chave
+   envolvida.
+3. Reescreve `DATABASE_URL` e `DIRECT_URL` preservando host, porta, base e
+   parâmetros.
+4. Se nada mudou, encerra sem tocar em nada — por isso pode rodar a cada cinco
+   minutos.
+5. Se mudou, recria **apenas** o contêiner `api` e confere `/health/db` antes de
+   declarar sucesso.
+
+**A pior janela de indisponibilidade é o intervalo do timer**: até cinco minutos
+entre a rotação e a correção.
+
+### Três detalhes do script que não são óbvios
+
+**A troca é feita em Python, não em `sed`.** Senha gerada pela AWS contém
+caracteres como `/`, `@`, `#`, `%` e `?`, que precisam ser *percent-encoded* para
+caber na URL do Prisma. Escapar isso em `sed` é fonte garantida de erro
+silencioso — e erro silencioso aqui significa uma senha que não funciona escrita
+com cara de certa.
+
+**O script pega a mesma trava do deploy.** Recriar o contêiner da `api` enquanto
+um deploy constrói imagens é precisamente a corrida que derrubou a produção por
+25 horas. Com `flock -n`, se houver deploy em andamento o tique desiste e o
+próximo tenta de novo.
+
+**A senha nunca aparece em log nem em linha de comando.** Ela trafega por
+variável de shell e por *stdin*; argumento de processo seria visível em `ps` para
+qualquer usuário da máquina. O script imprime apenas `inalterado` ou
+`alterado`.
+
+## 4. Memória e disco: por que um script, e não o agente
 
 A EC2 não expõe memória nem espaço em disco. O hipervisor vê CPU, rede e o
 volume, mas não vê dentro do sistema operacional — essas três só saem de dentro.
@@ -81,7 +149,7 @@ Dois detalhes dele que não são óbvios:
   que não casa com nenhum alarme: o painel ficaria vazio sem nada quebrado
   aparentemente.
 
-## 4. O log da aplicação
+## 5. O log da aplicação
 
 O log da API vai para o grupo `/controlog/aplicacao`, com retenção de 14 dias.
 Curta de propósito: o log serve para investigar incidente recente, e retenção
@@ -169,7 +237,7 @@ fields @timestamp, @message
 | limit 50
 ```
 
-## 5. Custo
+## 6. Custo
 
 | Item | Custo |
 |---|---|
@@ -187,7 +255,7 @@ verificação de fora da AWS.
 > da AWS estava expirada. Confirme na página de preços do Route 53 antes de
 > subir, já que o orçamento do projeto é de 10 dólares por mês.
 
-## 6. Como subir
+## 7. Como subir
 
 Três passos, e o segundo depende do primeiro.
 
@@ -282,7 +350,33 @@ instância é anterior à 1.11.3: em `--metric-data`, `Dimensions` é uma lista 
 estruturas, e a sintaxe abreviada `Dimensions=InstanceId=…` é recusada. O script
 usa JSON por isso.
 
-### 4. O envio de log, quando quiser ligar
+### 4. O timer da senha do banco, na instância
+
+```bash
+cd ~/controlog
+sudo install -m 755 scripts/sincronizar-senha-do-banco.sh /usr/local/bin/controlog-senha-banco
+
+# Primeira execução à mão. Imprime apenas `inalterado` ou `alterado`, nunca a
+# senha. Se der AccessDenied, a permissão do passo 2 não propagou.
+/usr/local/bin/controlog-senha-banco
+
+sudo install -m 644 infra/systemd/controlog-senha-banco.service /etc/systemd/system/
+sudo install -m 644 infra/systemd/controlog-senha-banco.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now controlog-senha-banco.timer
+
+systemctl list-timers controlog-senha-banco.timer
+```
+
+Como no timer das métricas, confira que o `NEXT` tem data e hora, e não `-`.
+
+> **Sem este passo, a aplicação quebra a cada 7 dias.** A rotação da senha
+> mestra do RDS é automática e não avisa; o que avisa é o alarme
+> `controlog-site-fora-do-ar`, até cinco minutos depois — e com este timer
+> instalado ele nem chega a disparar, porque a correção acontece antes dos dois
+> períodos de 60 s que o alarme exige.
+
+### 5. O envio de log, quando quiser ligar
 
 ```bash
 echo 'CONTROLOG_LOGS_CLOUDWATCH=1' >> .env.production
@@ -292,7 +386,7 @@ bash scripts/deploy-instancia.sh
 O script detecta a variável e inclui a sobreposição. Para desligar, remova a
 linha e publique de novo.
 
-## 7. Como verificar que está funcionando
+## 8. Como verificar que está funcionando
 
 | O quê | Como |
 |---|---|
@@ -300,10 +394,31 @@ linha e publique de novo.
 | Log chegando | `aws logs tail /controlog/aplicacao --follow --profile controlog` |
 | Notificação funcionando | `aws cloudwatch set-alarm-state --alarm-name controlog-ec2-memoria-alta --state-value ALARM --state-reason teste` e conferir se o e-mail chega |
 | Verificação externa | O alarme `controlog-site-fora-do-ar` deve estar em `OK`, não em `INSUFFICIENT_DATA` |
+| Readiness de verdade | `curl -s https://controlog.app/health/db` deve devolver `"banco":"ok"` |
+| Sincronia da senha | `systemctl list-timers controlog-senha-banco.timer` com `NEXT` preenchido, e `journalctl -u controlog-senha-banco -n 5` mostrando `inalterado` |
 
-O terceiro é o que mais vale fazer: alarme configurado com inscrição SNS não
-confirmada é o modo de falha mais comum deste tipo de montagem, e não dá nenhum
-sinal de que está errado.
+O da notificação é o que mais vale fazer: alarme configurado com inscrição SNS
+não confirmada é o modo de falha mais comum deste tipo de montagem, e não dá
+nenhum sinal de que está errado.
+
+### O teste que prova que o incidente não se repete
+
+Força uma rotação e confere que o sistema se recupera sozinho:
+
+```bash
+# na sua máquina — rotaciona a senha mestra agora
+aws secretsmanager rotate-secret --profile controlog --region us-east-1 \
+  --secret-id "$(aws rds describe-db-instances --profile controlog --region us-east-1 \
+      --db-instance-identifier controlog-db \
+      --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text)"
+```
+
+Esperado: `https://controlog.app/health/db` falha por alguns minutos, o timer
+detecta, recria a `api`, e volta a `"banco":"ok"` sem ninguém intervir. O
+`journalctl -u controlog-senha-banco` registra `alterado`.
+
+> Faça isso quando puder acompanhar. A rotação é real e a janela de
+> indisponibilidade também — até cinco minutos.
 
 ## Documentos relacionados
 

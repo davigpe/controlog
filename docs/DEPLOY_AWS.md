@@ -563,6 +563,22 @@ job fica vermelho com as últimas 40 linhas do log do build.
 > O `.env.production` continua só na instância. O workflow nunca o toca, e
 > nenhum segredo de produção passa pelo GitHub.
 
+### A senha do banco não é fixa
+
+O RDS usa **senha mestra gerenciada pela AWS**, guardada no Secrets Manager e
+**rotacionada automaticamente a cada 7 dias**. O `.env.production` tem a senha
+escrita dentro, então a cada rotação ela fica velha e todo acesso ao banco
+responde 500.
+
+Quem fecha essa lacuna é
+[`scripts/sincronizar-senha-do-banco.sh`](../scripts/sincronizar-senha-do-banco.sh),
+num timer do systemd a cada cinco minutos. Detalhes, instalação e o teste que
+força uma rotação estão em [OBSERVABILIDADE.md](OBSERVABILIDADE.md#3-a-senha-do-banco-rotaciona-sozinha).
+
+> **Se a aplicação começar a responder 500 em tudo que toca o banco**, a primeira
+> hipótese é esta. Confirme em `aws rds describe-events --source-identifier
+> controlog-db`: o evento é `Reset master credentials`.
+
 ### Nunca dois deploys ao mesmo tempo
 
 O script começa pegando uma trava (`flock -n` em `/tmp/controlog-deploy.lock`) e

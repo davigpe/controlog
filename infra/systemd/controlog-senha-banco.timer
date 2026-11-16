@@ -1,0 +1,24 @@
+[Unit]
+Description=Verifica a cada cinco minutos se a senha do banco foi rotacionada
+Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDADE.md
+
+[Timer]
+# OnCalendar, e nao OnUnitActiveSec, pelo mesmo motivo do timer de metricas:
+# OnUnitActiveSec ancora o proximo disparo na ultima ativacao do servico, e um
+# `Type=oneshot` que falha nao registra ativacao — o timer ficaria parado
+# justamente depois da primeira falha. Aqui isso seria pior ainda: a falha que
+# mais importa e exatamente a que acontece quando a senha acabou de mudar.
+#
+# Cinco minutos define a pior janela de indisponibilidade depois de uma
+# rotacao. Rotacao e a cada 7 dias, entao o custo de verificar e irrisorio
+# comparado ao de ficar fora do ar.
+OnCalendar=*:0/5
+
+# Executa na volta se a instancia estiver desligada na hora do disparo. So tem
+# efeito com OnCalendar.
+Persistent=true
+
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

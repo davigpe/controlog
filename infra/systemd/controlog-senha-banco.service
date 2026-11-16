@@ -1,0 +1,36 @@
+[Unit]
+# Mantem a senha do banco no .env.production igual a do Secrets Manager.
+#
+# O RDS usa senha mestra gerenciada pela AWS, com rotacao automatica a cada 7
+# dias. Sem esta unidade, a cada rotacao a credencial do arquivo fica velha e
+# todo acesso ao banco responde 500 — foi o que aconteceu em 16/11/2026, com
+# cinco horas de login quebrado antes de alguem notar.
+Description=Sincroniza a senha do banco do Controlog com o Secrets Manager
+Documentation=https://github.com/davigpe/controlog/blob/main/docs/OBSERVABILIDADE.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/controlog-senha-banco
+
+# Precisa rodar no diretorio do projeto: o script resolve .env.production e os
+# arquivos de compose a partir do proprio caminho, mas o `docker compose`
+# precisa do diretorio para derivar o nome do projeto. Nome de projeto
+# diferente criaria um segundo conjunto de conteineres em vez de recriar a api.
+WorkingDirectory=/home/ec2-user/controlog
+
+Environment=AWS_REGION=us-east-1
+
+# ec2-user, nao root: e quem esta no grupo docker e quem possui o
+# .env.production. Rodar como root criaria o arquivo novo com dono errado.
+User=ec2-user
+
+# Explicito, embora seja o padrao de oneshot. Se a API da AWS falhar, quem
+# tenta de novo e o proximo disparo do timer, em cinco minutos.
+Restart=no
+
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target
