@@ -319,8 +319,19 @@ Resources:
 
   # Verificacao de fora da AWS. Os alarmes acima observam recursos; este
   # responde a pergunta que importa de verdade, que e se o site esta no ar para
-  # quem acessa. Aponta para /health, e nao para a raiz, porque a raiz
-  # responderia o HTML da SPA mesmo com a API caida.
+  # quem acessa.
+  #
+  # Aponta para /health/db, e nao para /health nem para a raiz:
+  #
+  #  - a raiz responderia o HTML da SPA mesmo com a API inteira caida, porque
+  #    quem a serve e o nginx a partir de arquivos estaticos;
+  #  - /health e liveness puro, nao toca em dependencia nenhuma. Em 16/11/2026
+  #    a rotacao da senha do RDS derrubou todo acesso ao banco e esta checagem,
+  #    que apontava para /health, ficou verde por cinco horas. O alarme nunca
+  #    disparou e quem descobriu foi o usuario tentando entrar;
+  #  - /health/db consulta o banco com um SELECT 1 e responde 503 quando ele
+  #    esta inacessivel, que e o que faz esta checagem falhar e o alarme
+  #    disparar.
   ChecagemDeDisponibilidade:
     Type: AWS::Route53::HealthCheck
     Condition: ComChecagemExterna
@@ -328,7 +339,7 @@ Resources:
       HealthCheckConfig:
         Type: HTTPS
         FullyQualifiedDomainName: !Ref Dominio
-        ResourcePath: /health
+        ResourcePath: /health/db
         Port: 443
         RequestInterval: 30
         FailureThreshold: 3

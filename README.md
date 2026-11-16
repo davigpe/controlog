@@ -77,11 +77,12 @@ controlog/
 │   ├── cicd.yml           # CloudFormation: OIDC, role de deploy, perfil da instância
 │   ├── email.yml          # CloudFormation: identidade SES, DKIM, MAIL FROM
 │   ├── observabilidade.yml  # CloudFormation: alarmes, painel, log, health check
-│   └── systemd/           # unidade e timer que publicam as métricas da instância
+│   └── systemd/           # timers da instância: métricas e sincronia da senha do banco
 ├── scripts/
 │   ├── dev.mjs            # sobe banco, API e interface com um comando só
 │   ├── deploy-instancia.sh  # executado na instância pelo CI: build, sobe, verifica
-│   └── metricas-instancia.sh  # memória, swap e disco no CloudWatch (timer do systemd)
+│   ├── metricas-instancia.sh  # memória, swap e disco no CloudWatch (timer do systemd)
+│   └── sincronizar-senha-do-banco.sh  # acompanha a rotação da senha mestra do RDS
 ├── Caddyfile                # TLS automático, HSTS, redireciona www para o apex
 ├── docker-compose.https.yml # sobreposição que põe o Caddy na frente do nginx
 ├── docker-compose.logs.yml  # sobreposição opcional: log da API no CloudWatch
@@ -227,6 +228,13 @@ Memória, swap e disco não são métricas nativas da EC2: vêm de
 [`scripts/metricas-instancia.sh`](scripts/metricas-instancia.sh), disparado por um
 timer do systemd — mais leve do que o agente do CloudWatch pelo mesmo motivo, e
 sem processo parado ocupando memória entre as execuções.
+
+A verificação externa aponta para **`/health/db`**, não para `/health`: o
+primeiro consulta o banco, o segundo só prova que o processo subiu. A diferença
+não é teórica — a rotação automática da senha do RDS já deixou todo login
+respondendo 500 por cinco horas com o `/health` devolvendo 200 o tempo inteiro.
+Por isso também existe [`scripts/sincronizar-senha-do-banco.sh`](scripts/sincronizar-senha-do-banco.sh),
+que acompanha a rotação e recria a API quando a senha muda.
 
 Como subir, como verificar e o custo de cada item em
 [`docs/OBSERVABILIDADE.md`](docs/OBSERVABILIDADE.md).
