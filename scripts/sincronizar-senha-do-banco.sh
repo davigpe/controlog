@@ -8,7 +8,7 @@
 # horas todo acesso ao banco respondeu 500 — login incluido. Sem este script, o
 # mesmo acontece a cada sete dias.
 #
-# Executado por timer do systemd a cada cinco minutos. Quando a senha nao
+# Executado por timer do systemd a cada minuto. Quando a senha nao
 # mudou, nao faz nada; quando mudou, reescreve o .env.production e recria so o
 # conteiner da api. O pior caso e o site ficar sem banco os minutos entre a
 # rotacao e o proximo tique.
@@ -63,7 +63,7 @@ done
 # A mesma trava do deploy, de proposito. Recriar o conteiner da api enquanto um
 # deploy constroi imagens e exatamente a corrida que derrubou a producao por 25
 # horas. Com -n, se houver deploy em andamento este tique desiste e o proximo,
-# em cinco minutos, tenta de novo.
+# em um minuto, tenta de novo.
 exec {FD_TRAVA}>/tmp/controlog-deploy.lock
 if ! flock -n "$FD_TRAVA"; then
   echo 'deploy em andamento; pulando esta verificacao.'

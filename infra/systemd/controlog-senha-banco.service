@@ -31,7 +31,7 @@ Environment=AWS_REGION=us-east-1
 User=ec2-user
 
 # Explicito, embora seja o padrao de oneshot. Se a API da AWS falhar, quem
-# tenta de novo e o proximo disparo do timer, em cinco minutos.
+# tenta de novo e o proximo disparo do timer, em um minuto.
 Restart=no
 
 TimeoutStartSec=180
