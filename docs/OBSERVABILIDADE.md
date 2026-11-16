@@ -13,7 +13,7 @@ descobrir.
 | Métricas do banco | CloudWatch, nativas do RDS | O banco está no limite? |
 | Log investigável | CloudWatch Logs, grupo `/controlog/aplicacao` | O que aconteceu, exatamente? |
 | Notificação | Tópico SNS `controlog-alertas`, por e-mail | Alguém fica sabendo |
-| Sincronia da senha do banco | Timer do systemd, a cada 5 min | A credencial do banco ainda é a atual depois da rotação? |
+| Sincronia da senha do banco | Timer do systemd, a cada 1 min | A credencial do banco ainda é a atual depois da rotação? |
 
 Tudo em CloudFormation, em [`infra/observabilidade.yml`](../infra/observabilidade.yml).
 
@@ -92,7 +92,7 @@ banco passa a responder 500** — foi exatamente o incidente descrito acima.
 
 A ponte é
 [`scripts/sincronizar-senha-do-banco.sh`](../scripts/sincronizar-senha-do-banco.sh),
-disparado por timer do systemd a cada cinco minutos:
+disparado por timer do systemd a cada minuto:
 
 1. Descobre o ARN do segredo a partir da instância de banco
    (`MasterUserSecret.SecretArn`), em vez de tê-lo fixo em arquivo — o sufixo do
@@ -101,13 +101,24 @@ disparado por timer do systemd a cada cinco minutos:
    envolvida.
 3. Reescreve `DATABASE_URL` e `DIRECT_URL` preservando host, porta, base e
    parâmetros.
-4. Se nada mudou, encerra sem tocar em nada — por isso pode rodar a cada cinco
-   minutos.
+4. Se nada mudou, encerra sem tocar em nada — por isso pode rodar a cada
+   minuto.
 5. Se mudou, recria **apenas** o contêiner `api` e confere `/health/db` antes de
    declarar sucesso.
 
-**A pior janela de indisponibilidade é o intervalo do timer**: até cinco minutos
+**A pior janela de indisponibilidade é o intervalo do timer**: cerca de um minuto
 entre a rotação e a correção.
+
+O intervalo saiu de medição, não de estimativa. Com cinco minutos, uma rotação
+forçada em 16/11/2026 deixou o sistema fora por **5 min e 3 s**, enquanto o
+alarme `controlog-site-fora-do-ar` levou **4 min e 47 s** para disparar — o
+e-mail chegava junto com o problema já resolvido, que é ruído sem utilidade. Com
+um minuto, a recuperação acontece antes de o alarme disparar, e o alarme volta a
+significar o que deve: a recuperação automática falhou.
+
+O custo é uma chamada ao Secrets Manager por minuto, cerca de 43 mil por mês, a
+US$ 0,05 por 10 mil — **aproximadamente US$ 0,22 mensais**. Não é nível
+gratuito; é barato.
 
 ### Três detalhes do script que não são óbvios
 
@@ -245,15 +256,22 @@ fields @timestamp, @message
 | 1 painel | Gratuito — o nível gratuito cobre 3 |
 | Métricas customizadas (3) | Gratuito até 10 |
 | Logs | Por GB ingerido; o volume da API é baixo, e a retenção de 14 dias limita o armazenamento |
-| *Health check* do Route 53 | **Único item pago da stack** |
+| Leitura do segredo a cada minuto | ~43 mil chamadas/mês a US$ 0,05 por 10 mil ≈ **US$ 0,22/mês** |
+| *Health check* do Route 53 | Pago; ver abaixo |
 
 O *health check* pode ser desligado com `CriarChecagemExterna=nao` nos
 parâmetros, e os outros oito alarmes continuam funcionando — o que se perde é a
-verificação de fora da AWS.
+verificação de fora da AWS, que é justamente a única que enxerga o sistema como
+o usuário o vê.
+
+A leitura do segredo pode ficar mais barata subindo o intervalo do timer de 1
+para 5 minutos (cai para ~US$ 0,04/mês), ao custo de a janela de
+indisponibilidade numa rotação voltar a ultrapassar o tempo de disparo do
+alarme. A seção 3 tem os números medidos.
 
 > Não consegui confirmar o preço atual do *health check* nesta sessão: a sessão
-> da AWS estava expirada. Confirme na página de preços do Route 53 antes de
-> subir, já que o orçamento do projeto é de 10 dólares por mês.
+> da AWS estava expirada. Confirme na página de preços do Route 53, já que o
+> orçamento do projeto é de 10 dólares por mês.
 
 ## 7. Como subir
 
@@ -372,9 +390,10 @@ Como no timer das métricas, confira que o `NEXT` tem data e hora, e não `-`.
 
 > **Sem este passo, a aplicação quebra a cada 7 dias.** A rotação da senha
 > mestra do RDS é automática e não avisa; o que avisa é o alarme
-> `controlog-site-fora-do-ar`, até cinco minutos depois — e com este timer
-> instalado ele nem chega a disparar, porque a correção acontece antes dos dois
-> períodos de 60 s que o alarme exige.
+> `controlog-site-fora-do-ar`. Com este timer instalado o alarme não chega a
+> disparar numa rotação normal, porque a correção acontece antes dos dois
+> períodos de 60 s que ele exige — se ele disparar, é sinal de que a recuperação
+> automática falhou, que é exatamente o que um alarme deve significar.
 
 ### 5. O envio de log, quando quiser ligar
 
@@ -418,7 +437,7 @@ detecta, recria a `api`, e volta a `"banco":"ok"` sem ninguém intervir. O
 `journalctl -u controlog-senha-banco` registra `alterado`.
 
 > Faça isso quando puder acompanhar. A rotação é real e a janela de
-> indisponibilidade também — até cinco minutos.
+> indisponibilidade também — cerca de um minuto.
 
 ## Documentos relacionados
 
