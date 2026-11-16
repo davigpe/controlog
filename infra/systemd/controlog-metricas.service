@@ -15,6 +15,13 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/bin/controlog-metricas
 
+# Explicito, embora seja o padrao de oneshot: nao reinicia sozinho. Se a rede
+# ou a API da AWS falhar, quem tenta de novo e o proximo disparo do timer, em
+# cinco minutos. Reiniciar aqui so empilharia tentativas durante uma
+# indisponibilidade, e o timer usa OnCalendar justamente para nao depender do
+# resultado da execucao anterior.
+Restart=no
+
 # A credencial vem do instance profile, pelo metadata; nao ha chave em lugar
 # nenhum. A regiao e explicita para o caso de a unidade rodar sem o ambiente do
 # shell, onde AWS_REGION nao estaria definida.
