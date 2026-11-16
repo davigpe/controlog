@@ -563,6 +563,39 @@ job fica vermelho com as últimas 40 linhas do log do build.
 > O `.env.production` continua só na instância. O workflow nunca o toca, e
 > nenhum segredo de produção passa pelo GitHub.
 
+### Nunca dois deploys ao mesmo tempo
+
+O script começa pegando uma trava (`flock -n` em `/tmp/controlog-deploy.lock`) e
+**recusa na hora** se já houver um deploy em andamento.
+
+Isso não é precaução teórica. Um deploy feito à mão por SSH rodou junto com o do
+CI por SSM, e o resultado foi **cerca de 25 horas de indisponibilidade**:
+
+1. As duas execuções disputaram os mesmos contêineres. Uma parou o `web`, a
+   outra não conseguiu subir, e o Caddy ficou devolvendo **502 em tudo** — site e
+   API — porque ele continuava de pé sem ninguém atrás.
+2. As duas escreveram no mesmo `/tmp/controlog-deploy.log`, com `>`. A segunda
+   truncou o arquivo que a primeira ainda estava escrevendo, e o `tail -40` do
+   diagnóstico passou a mostrar o build **da outra versão** em vez do erro de
+   quem falhou. A evidência da causa foi destruída junto com o site.
+
+O `concurrency` do workflow não cobre isso: ele impede dois deploys do GitHub
+Actions e não vê nada que rode na mão na instância.
+
+A trava usa `-n` (recusa) em vez de esperar: um deploy pendurado atrás de outro
+estouraria o tempo do SSM e reprovaria igual, só mais devagar e sem dizer por
+quê.
+
+**Antes de rodar o script à mão**, confirme que não há nada em andamento:
+
+```bash
+pgrep -af 'deploy-instancia|docker.*compose' || echo 'nenhum deploy em andamento'
+```
+
+A trava fica em `/tmp` e não em `/var/lock` porque na Amazon Linux 2023 o
+`/var/lock` pertence ao root, e o script roda como `ec2-user` — a criação do
+arquivo falharia e reprovaria todo deploy.
+
 ## 10. E-mail transacional (Amazon SES)
 
 É por aqui que sai o link de "esqueci minha senha". Sem isto configurado, o

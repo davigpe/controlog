@@ -19,6 +19,38 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Exclusao mutua. Nao e precaucao teorica: duas execucoes simultaneas — uma a
+# mao por SSH e a do CI por SSM — derrubaram a producao por cerca de 25 horas.
+# Elas disputaram os mesmos conteineres (uma parou o `web`, a outra nao
+# conseguiu subir, e o Caddy ficou devolvendo 502) e sobrescreveram este mesmo
+# arquivo de log, o que destruiu a evidencia: o log mostrava um build de outra
+# versao, nao o erro de quem falhou.
+#
+# O `concurrency` do workflow nao cobre isto. Ele impede dois deploys do
+# GitHub Actions, e nao ve nada que rode na mao na instancia.
+#
+# -n em vez de espera: um deploy que ficasse pendurado atras de outro
+# estouraria o tempo do SSM e reprovaria do mesmo jeito, so mais devagar e sem
+# dizer por que. Recusar na hora, dizendo o motivo, e mais util.
+# Em /tmp, e nao em /var/lock: na Amazon Linux 2023 o /var/lock pertence ao
+# root, e este script roda como ec2-user — a trava falharia na criacao do
+# arquivo e reprovaria todo deploy.
+TRAVA=/tmp/controlog-deploy.lock
+
+if ! command -v flock >/dev/null 2>&1; then
+  echo 'FALHOU: flock nao encontrado (pacote util-linux).'
+  echo 'Sem ele nao ha protecao contra dois deploys simultaneos, que e o que'
+  echo 'derrubou a producao antes. Instale com: sudo dnf install -y util-linux'
+  exit 1
+fi
+
+exec {FD_TRAVA}>"$TRAVA"
+if ! flock -n "$FD_TRAVA"; then
+  echo 'FALHOU: ja existe um deploy em andamento nesta instancia.'
+  echo 'Espere ele terminar. Rodar dois ao mesmo tempo derruba o site.'
+  exit 1
+fi
+
 LOG=/tmp/controlog-deploy.log
 ARQUIVOS=(-f docker-compose.prod.yml -f docker-compose.https.yml)
 
