@@ -29,13 +29,24 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 # O `concurrency` do workflow nao cobre isto. Ele impede dois deploys do
 # GitHub Actions, e nao ve nada que rode na mao na instancia.
 #
-# -n em vez de espera: um deploy que ficasse pendurado atras de outro
-# estouraria o tempo do SSM e reprovaria do mesmo jeito, so mais devagar e sem
-# dizer por que. Recusar na hora, dizendo o motivo, e mais util.
+# Espera limitada, e nao recusa imediata. A primeira versao usava -n, pensando
+# so na disputa deploy-contra-deploy: ali recusar na hora e melhor que pendurar
+# ate estourar o tempo do SSM. O que faltou foi o terceiro disputante.
+#
+# O controlog-senha-banco.service pega esta mesma trava, de proposito, e com -n
+# um deploy legitimo era reprovado por perder a corrida para ele — aconteceu em
+# 16/11/2026, logo depois de a 1.11.6 passar aquele timer de 5 min para 1 min.
+# O script de senha agora segura a trava por milissegundos, mas uma coincidencia
+# de milissegundos continua possivel, e reprovar um deploy por isso e absurdo.
+#
+# 120 s cobre com folga qualquer disputa com o script de senha, e ainda reprova
+# bem antes dos 700 s que o workflow passa consultando o SSM — ou seja, contra
+# um deploy concorrente de verdade a mensagem continua chegando, so 2 min depois.
 # Em /tmp, e nao em /var/lock: na Amazon Linux 2023 o /var/lock pertence ao
 # root, e este script roda como ec2-user — a trava falharia na criacao do
 # arquivo e reprovaria todo deploy.
 TRAVA=/tmp/controlog-deploy.lock
+ESPERA_PELA_TRAVA=120
 
 if ! command -v flock >/dev/null 2>&1; then
   echo 'FALHOU: flock nao encontrado (pacote util-linux).'
@@ -45,8 +56,9 @@ if ! command -v flock >/dev/null 2>&1; then
 fi
 
 exec {FD_TRAVA}>"$TRAVA"
-if ! flock -n "$FD_TRAVA"; then
-  echo 'FALHOU: ja existe um deploy em andamento nesta instancia.'
+if ! flock -w "$ESPERA_PELA_TRAVA" "$FD_TRAVA"; then
+  echo "FALHOU: ja existe um deploy em andamento nesta instancia, e ele nao"
+  echo "liberou a trava em ${ESPERA_PELA_TRAVA}s de espera."
   echo 'Espere ele terminar. Rodar dois ao mesmo tempo derruba o site.'
   exit 1
 fi
