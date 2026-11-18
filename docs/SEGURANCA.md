@@ -2,26 +2,38 @@
 
 O que roda, o que cada ferramenta cobre, e o que foi conscientemente aceito.
 
-## 1. As quatro camadas
+## 1. As cinco camadas
 
 | Camada | Ferramenta | Onde roda | O que pega |
 |---|---|---|---|
 | Lint do backend | ESLint 10 + `eslint-plugin-security` | CI, a cada *push* e PR | Erro de código e padrão inseguro em Node |
 | Lint do frontend | ESLint 10 + `typescript-eslint` + regras do React | CI, a cada *push* e PR | Erro de código e uso incorreto de *hooks* |
 | SAST | CodeQL (`javascript-typescript`) | CI, a cada *push*, PR e semanalmente | Falha que depende de seguir o dado da entrada até o uso: injeção, XSS, travessia de caminho |
+| Qualidade e métricas | SonarCloud | CI, a cada *push* e PR, depois dos testes | Cobertura, *code smells*, duplicação, complexidade e dívida técnica, com *quality gate* |
 | Dependências | `npm audit` + `dependency-review-action` + Dependabot | CI e semanalmente | Vulnerabilidade conhecida em pacote de terceiro |
 
-Nenhuma das quatro depende de serviço externo com conta a configurar: todas
-rodam no GitHub Actions do próprio repositório.
-
-### Por que CodeQL e não SonarCloud
+### CodeQL e SonarCloud: papéis diferentes
 
 As diretrizes do portfólio citam SonarQube, SonarCloud e CodeClimate como
-exemplos. O CodeQL faz o mesmo papel de análise estática de segurança, com duas
-vantagens no contexto deste projeto: não exige cadastro em serviço externo nem
-*token* guardado no repositório, e os achados aparecem na própria aba *Security*
-do GitHub, junto dos alertas de dependência. O custo é não ter a métrica de
-*code smell* que o Sonar calcula — papel que aqui é do ESLint.
+exemplos. O CodeQL já fazia a análise estática de segurança, com os achados na
+aba *Security* do GitHub, junto dos alertas de dependência. O que faltava era a
+**métrica**: o ESLint aprova ou reprova, mas não diz quanto código está coberto,
+quanto está duplicado nem quanta dívida técnica acumulou. Esse é o papel do
+SonarCloud.
+
+- **Painel:** [sonarcloud.io/project/overview?id=davigpe_controlog](https://sonarcloud.io/project/overview?id=davigpe_controlog),
+  com os *badges* no topo do README.
+- **Configuração:** [`sonar-project.properties`](../sonar-project.properties),
+  na raiz. Os recortes de cobertura são os mesmos do Jest e do Vitest, para o
+  número do painel bater com o do `npm run test:coverage`.
+- **Cobertura:** os jobs `backend` e `frontend` do CI rodam
+  `npm run test:coverage`, o que também faz o mínimo de 70% (RNF07) reprovar o
+  CI, e entregam o `lcov.info` ao job `sonar`.
+- **Análise pelo CI, não automática:** a análise automática do SonarCloud está
+  desligada, porque ela não recebe a cobertura. O *token* fica no *secret*
+  `SONAR_TOKEN` do repositório.
+- **Não bloqueia o deploy:** o *quality gate* aparece no painel e no PR, mas o
+  deploy depende só de lint, testes e auditoria.
 
 ## 2. O lint do backend
 
@@ -170,5 +182,10 @@ cd controlog-frontend && npm run lint
 cd controlog-backend && npm audit
 cd controlog-frontend && npm audit
 
+# Cobertura (o mesmo lcov que o CI envia ao SonarCloud)
+cd controlog-backend && npm run test:coverage
+cd controlog-frontend && npm run test:coverage
+
 # CodeQL roda no CI; os achados ficam em Security > Code scanning
+# SonarCloud roda no CI; o painel fica em sonarcloud.io (link na seção 1)
 ```
