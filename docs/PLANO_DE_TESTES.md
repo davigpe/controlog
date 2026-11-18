@@ -98,14 +98,22 @@ de uma mesma rede por causa de uma única tentativa.
 | Frontend — acessibilidade estrutural | `vitest-axe` (mesmo motor `axe-core`), regra `color-contrast` desligada (não confiável em jsdom) | Nome acessível de botões/campos, labels de formulário, atributos ARIA válidos — ver [`docs/AUDITORIA_ACESSIBILIDADE.md`](AUDITORIA_ACESSIBILIDADE.md) |
 | Frontend — fluxo completo | Playwright (execução manual/exploratória, ponta a ponta com backend e banco reais) | Login → navegação → CRUD → bloqueio de regra de negócio → logout |
 
-**Cobertura automatizada atual:**
+**Cobertura automatizada** (medição de 18/11/2026; o valor atual fica no
+[painel do SonarCloud](https://sonarcloud.io/project/overview?id=davigpe_controlog)):
 
-- **Backend:** 182 testes em 20 suítes — **94,2% statements**, **90,8% funções**, **80,8% branches**.
+- **Backend:** 308 testes em 28 suítes — **88,9% statements**, **84,2% funções**, **77,2% branches**.
   Comando: `cd controlog-backend && npm run test:coverage`.
-- **Frontend:** 199 testes em 30 suítes — **83,2% statements**, **77,8% funções**, **80,4% branches**.
+- **Frontend:** 324 testes em 42 suítes — **81,1% statements**, **77,6% funções**, **76,9% branches**.
   Comando: `cd controlog-frontend && npm run test:coverage`.
 
 Ambos acima da meta de 70% definida na RNF07.
+
+**Caixa branca e caixa preta:** os testes unitários de *services* e
+*middlewares* são de caixa branca; integração HTTP, casos por requisito e o
+roteiro exploratório são de caixa preta. Os critérios de cobertura, a cobertura
+por módulo e o **teste de caminho básico** (grafo de fluxo, complexidade
+ciclomática e caminhos independentes) aplicado às regras RN02, RN03, RN05 e
+RN08 estão em [`TESTES_CAIXA_BRANCA.md`](TESTES_CAIXA_BRANCA.md).
 
 **Lacuna conhecida:** os fluxos de criação de Rota e Entrega que dependem de múltiplos
 `Select` (Radix UI) encadeados têm cobertura mais leve no frontend — a interação com esses
