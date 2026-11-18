@@ -185,7 +185,7 @@ npm test
 npm run test:coverage
 ```
 
-Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio.
+Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio, e [`docs/TESTES_CAIXA_BRANCA.md`](docs/TESTES_CAIXA_BRANCA.md) para os testes de caixa branca: critérios de cobertura, grafo de fluxo, complexidade ciclomática e caminhos independentes das regras de negócio.
 
 ---
 
