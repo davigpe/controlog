@@ -16,7 +16,7 @@ jobs:
       run:
         working-directory: controlog-backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -40,7 +40,7 @@ jobs:
       run:
         working-directory: controlog-frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,7 +65,7 @@ jobs:
     # painel e no PR, mas uma queda de nota nao segura uma publicacao que
     # passou em lint, testes e auditoria.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Historico completo: o Sonar usa o blame para separar codigo novo
           # de codigo antigo.
@@ -104,7 +104,7 @@ jobs:
       pull-requests: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
