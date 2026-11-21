@@ -30,7 +30,8 @@ export default defineConfig({
     testTimeout: 30000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      // lcov é o formato que o SonarCloud lê (job `sonar` do CI).
+      reporter: ['text', 'html', 'lcov'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/main.tsx',
