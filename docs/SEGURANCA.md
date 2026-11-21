@@ -45,7 +45,7 @@ seis foram corrigidas e sete foram aceitas com justificativa.
 | Achado | Onde | Correção |
 |---|---|---|
 | Gerador pseudoaleatório (3×) | `services/pedido.service.js` | `crypto.randomInt` no lugar de `Math.random`. O sorteio só gera dados de demonstração, mas o gerador criptográfico custa o mesmo |
-| `npm ci` sem `--ignore-scripts` (2×) | `ci.yml`, jobs `backend` e `frontend` | `npm ci --ignore-scripts`. O único script necessário, o `prisma generate`, virou passo explícito |
+| `npm ci` sem `--ignore-scripts` (2×) | `ci.yml`, jobs `backend` e `frontend` | `npm ci --ignore-scripts`. O único script necessário, o `prisma generate`, virou passo explícito (`npm run prisma:generate`, sem `npx`, para não baixar pacote na hora) |
 | *Action* sem SHA fixo | `ci.yml`, `configure-aws-credentials` | Fixada no commit da v4, como a do Sonar. É a *action* que recebe a credencial da AWS |
 
 **Aceitas**, com o filtro por regra e por arquivo em
