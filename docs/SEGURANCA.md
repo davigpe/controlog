@@ -35,6 +35,32 @@ SonarCloud.
 - **Não bloqueia o deploy:** o *quality gate* aparece no painel e no PR, mas o
   deploy depende só de lint, testes e auditoria.
 
+### Achados de segurança do SonarCloud
+
+A primeira análise apontou 13 vulnerabilidades. Todas foram lidas uma por uma:
+seis foram corrigidas e sete foram aceitas com justificativa.
+
+**Corrigidas:**
+
+| Achado | Onde | Correção |
+|---|---|---|
+| Gerador pseudoaleatório (3×) | `services/pedido.service.js` | `crypto.randomInt` no lugar de `Math.random`. O sorteio só gera dados de demonstração, mas o gerador criptográfico custa o mesmo |
+| `npm ci` sem `--ignore-scripts` (2×) | `ci.yml`, jobs `backend` e `frontend` | `npm ci --ignore-scripts`. O único script necessário, o `prisma generate`, virou passo explícito (`npm run prisma:generate`, sem `npx`, para não baixar pacote na hora) |
+| *Action* sem SHA fixo | `ci.yml`, `configure-aws-credentials` | Fixada no commit da v4, como a do Sonar. É a *action* que recebe a credencial da AWS |
+
+**Aceitas**, com o filtro por regra e por arquivo em
+[`sonar-project.properties`](../sonar-project.properties). A mesma regra
+continua valendo no resto do projeto:
+
+| Achado | Onde | Por que foi aceito |
+|---|---|---|
+| Senha de PostgreSQL no código | `config/env.js` | É a URL do banco **de teste** (`localhost`), usada só com `NODE_ENV=test`. Em qualquer outro ambiente, `DATABASE_URL` é obrigatória |
+| `Resource: '*'` em IAM | `infra/cicd.yml` | `rds:DescribeDBInstances` e `cloudwatch:PutMetricData` só leem metadados ou publicam métrica. `PutMetricData` não aceita restrição por recurso; nenhuma das duas devolve segredo |
+| Tópico SNS sem KMS | `infra/observabilidade.yml` | Os alarmes do CloudWatch não publicam em tópico criptografado com a chave gerenciada `aws/sns`. Seria preciso uma chave própria, com custo mensal, para proteger só o texto dos alarmes |
+| `npm ci` sem `--ignore-scripts` (2×) | Dockerfiles | O backend precisa do `postinstall` do Prisma, que baixa os *engines* usados pelo `prisma migrate deploy` na subida do contêiner |
+| nginx como *root* | `controlog-frontend/Dockerfile` | Na imagem oficial, só o processo mestre roda como *root*, para abrir a porta 80. Os *workers* que atendem as requisições rodam como `nginx`, e o contêiner só serve arquivos estáticos |
+| `PATH` herdado | `scripts/dev.mjs` | Script que só roda na máquina de quem desenvolve, nunca em servidor |
+
 ## 2. O lint do backend
 
 Entrou junto desta análise; antes havia ESLint só no frontend. A configuração

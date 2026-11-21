@@ -1,9 +1,12 @@
-import { randomUUID } from 'node:crypto';
+// randomInt, e nao Math.random: o sorteio aqui so gera dados de demonstracao
+// (cliente, unidades, volume), sem nada de seguranca, mas usar o gerador
+// criptografico custa o mesmo e tira a duvida de quem le.
+import { randomInt, randomUUID } from 'node:crypto';
 import { paginationArgs, paginationMeta } from '../utils/pagination.js';
 import { ValidationError } from '../utils/AppError.js';
 
 function escolher(lista) {
-  return lista[Math.floor(Math.random() * lista.length)];
+  return lista[randomInt(lista.length)];
 }
 
 /**
@@ -29,8 +32,9 @@ function pedidoParaCliente(cliente) {
     cidade: cliente.bairro,
     lat: cliente.lat,
     lng: cliente.lng,
-    unidades: Math.floor(Math.random() * 20) + 1,
-    volumeM3: Math.round((Math.random() * 0.9 + 0.1) * 100) / 100,
+    // 1 a 20 unidades; 0,10 a 1,00 m³, em centésimos (randomInt exclui o máximo).
+    unidades: randomInt(1, 21),
+    volumeM3: randomInt(10, 101) / 100,
   };
 }
 

@@ -22,7 +22,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: controlog-backend/package-lock.json
-      - run: npm ci
+      # --ignore-scripts: nenhum pacote de terceiro roda script de instalacao
+      # no CI. O unico script de que o projeto precisa e o proprio postinstall
+      # (`prisma generate`), chamado explicitamente no passo seguinte. Pelo
+      # script do package.json, e nao por `npx`: o npx baixaria o pacote na
+      # hora se nao o achasse, e o script so usa o Prisma do package-lock.
+      - run: npm ci --ignore-scripts
+      - run: npm run prisma:generate
       - run: npm run lint
       # Com cobertura, e nao `npm test`: assim o minimo do jest.config.js
       # (coverageThreshold) reprova o CI, e o lcov segue para o job `sonar`.
@@ -46,7 +52,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: controlog-frontend/package-lock.json
-      - run: npm ci
+      # O frontend nao depende de nenhum script de instalacao: os binarios
+      # nativos (esbuild, rolldown) vem como optionalDependencies por
+      # plataforma.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run build
       # Mesmo motivo do backend: os thresholds do vite.config.ts passam a valer.
@@ -163,7 +172,9 @@ jobs:
 
     steps:
       - name: Autenticar na AWS por OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        # Fixada no commit da v4, e nao na tag: e a action que recebe a
+        # credencial da AWS, e tag pode ser movida.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
