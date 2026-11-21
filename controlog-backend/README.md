@@ -79,7 +79,7 @@ A API sobe em `http://localhost:3333`. Health check: `GET /health`.
 
 ## Testes
 
-Os testes unitários injetam um Prisma Client mockado diretamente nos services (todos os services são fábricas `create*Service(prisma)`), então **não é necessário ter o banco rodando** para executar `npm test`. Cobertura atual: 182 testes, acima de 90% de statements/lines (meta do RFC, RNF07, é ≥70%).
+Os testes unitários injetam um Prisma Client mockado diretamente nos services (todos os services são fábricas `create*Service(prisma)`), então **não é necessário ter o banco rodando** para executar `npm test`. Cobertura (18/11/2026): 308 testes, 88,9% de statements e 77,2% de branches (meta do RFC, RNF07, é ≥70%). Os testes de caixa branca estão descritos em [`docs/TESTES_CAIXA_BRANCA.md`](../docs/TESTES_CAIXA_BRANCA.md).
 
 ## Autenticação
 
