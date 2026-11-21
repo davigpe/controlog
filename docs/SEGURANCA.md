@@ -2,26 +2,64 @@
 
 O que roda, o que cada ferramenta cobre, e o que foi conscientemente aceito.
 
-## 1. As quatro camadas
+## 1. As cinco camadas
 
 | Camada | Ferramenta | Onde roda | O que pega |
 |---|---|---|---|
 | Lint do backend | ESLint 10 + `eslint-plugin-security` | CI, a cada *push* e PR | Erro de código e padrão inseguro em Node |
 | Lint do frontend | ESLint 10 + `typescript-eslint` + regras do React | CI, a cada *push* e PR | Erro de código e uso incorreto de *hooks* |
 | SAST | CodeQL (`javascript-typescript`) | CI, a cada *push*, PR e semanalmente | Falha que depende de seguir o dado da entrada até o uso: injeção, XSS, travessia de caminho |
+| Qualidade e métricas | SonarCloud | CI, a cada *push* e PR, depois dos testes | Cobertura, *code smells*, duplicação, complexidade e dívida técnica, com *quality gate* |
 | Dependências | `npm audit` + `dependency-review-action` + Dependabot | CI e semanalmente | Vulnerabilidade conhecida em pacote de terceiro |
 
-Nenhuma das quatro depende de serviço externo com conta a configurar: todas
-rodam no GitHub Actions do próprio repositório.
-
-### Por que CodeQL e não SonarCloud
+### CodeQL e SonarCloud: papéis diferentes
 
 As diretrizes do portfólio citam SonarQube, SonarCloud e CodeClimate como
-exemplos. O CodeQL faz o mesmo papel de análise estática de segurança, com duas
-vantagens no contexto deste projeto: não exige cadastro em serviço externo nem
-*token* guardado no repositório, e os achados aparecem na própria aba *Security*
-do GitHub, junto dos alertas de dependência. O custo é não ter a métrica de
-*code smell* que o Sonar calcula — papel que aqui é do ESLint.
+exemplos. O CodeQL já fazia a análise estática de segurança, com os achados na
+aba *Security* do GitHub, junto dos alertas de dependência. O que faltava era a
+**métrica**: o ESLint aprova ou reprova, mas não diz quanto código está coberto,
+quanto está duplicado nem quanta dívida técnica acumulou. Esse é o papel do
+SonarCloud.
+
+- **Painel:** [sonarcloud.io/project/overview?id=davigpe_controlog](https://sonarcloud.io/project/overview?id=davigpe_controlog),
+  com os *badges* no topo do README.
+- **Configuração:** [`sonar-project.properties`](../sonar-project.properties),
+  na raiz. Os recortes de cobertura são os mesmos do Jest e do Vitest, para o
+  número do painel bater com o do `npm run test:coverage`.
+- **Cobertura:** os jobs `backend` e `frontend` do CI rodam
+  `npm run test:coverage`, o que também faz o mínimo de 70% (RNF07) reprovar o
+  CI, e entregam o `lcov.info` ao job `sonar`.
+- **Análise pelo CI, não automática:** a análise automática do SonarCloud está
+  desligada, porque ela não recebe a cobertura. O *token* fica no *secret*
+  `SONAR_TOKEN` do repositório.
+- **Não bloqueia o deploy:** o *quality gate* aparece no painel e no PR, mas o
+  deploy depende só de lint, testes e auditoria.
+
+### Achados de segurança do SonarCloud
+
+A primeira análise apontou 13 vulnerabilidades. Todas foram lidas uma por uma:
+seis foram corrigidas e sete foram aceitas com justificativa.
+
+**Corrigidas:**
+
+| Achado | Onde | Correção |
+|---|---|---|
+| Gerador pseudoaleatório (3×) | `services/pedido.service.js` | `crypto.randomInt` no lugar de `Math.random`. O sorteio só gera dados de demonstração, mas o gerador criptográfico custa o mesmo |
+| `npm ci` sem `--ignore-scripts` (2×) | `ci.yml`, jobs `backend` e `frontend` | `npm ci --ignore-scripts`. O único script necessário, o `prisma generate`, virou passo explícito (`npm run prisma:generate`, sem `npx`, para não baixar pacote na hora) |
+| *Action* sem SHA fixo | `ci.yml`, `configure-aws-credentials` | Fixada no commit da v4, como a do Sonar. É a *action* que recebe a credencial da AWS |
+
+**Aceitas**, com o filtro por regra e por arquivo em
+[`sonar-project.properties`](../sonar-project.properties). A mesma regra
+continua valendo no resto do projeto:
+
+| Achado | Onde | Por que foi aceito |
+|---|---|---|
+| Senha de PostgreSQL no código | `config/env.js` | É a URL do banco **de teste** (`localhost`), usada só com `NODE_ENV=test`. Em qualquer outro ambiente, `DATABASE_URL` é obrigatória |
+| `Resource: '*'` em IAM | `infra/cicd.yml` | `rds:DescribeDBInstances` e `cloudwatch:PutMetricData` só leem metadados ou publicam métrica. `PutMetricData` não aceita restrição por recurso; nenhuma das duas devolve segredo |
+| Tópico SNS sem KMS | `infra/observabilidade.yml` | Os alarmes do CloudWatch não publicam em tópico criptografado com a chave gerenciada `aws/sns`. Seria preciso uma chave própria, com custo mensal, para proteger só o texto dos alarmes |
+| `npm ci` sem `--ignore-scripts` (2×) | Dockerfiles | O backend precisa do `postinstall` do Prisma, que baixa os *engines* usados pelo `prisma migrate deploy` na subida do contêiner |
+| nginx como *root* | `controlog-frontend/Dockerfile` | Na imagem oficial, só o processo mestre roda como *root*, para abrir a porta 80. Os *workers* que atendem as requisições rodam como `nginx`, e o contêiner só serve arquivos estáticos |
+| `PATH` herdado | `scripts/dev.mjs` | Script que só roda na máquina de quem desenvolve, nunca em servidor |
 
 ## 2. O lint do backend
 
@@ -170,5 +208,10 @@ cd controlog-frontend && npm run lint
 cd controlog-backend && npm audit
 cd controlog-frontend && npm audit
 
+# Cobertura (o mesmo lcov que o CI envia ao SonarCloud)
+cd controlog-backend && npm run test:coverage
+cd controlog-frontend && npm run test:coverage
+
 # CodeQL roda no CI; os achados ficam em Security > Code scanning
+# SonarCloud roda no CI; o painel fica em sonarcloud.io (link na seção 1)
 ```

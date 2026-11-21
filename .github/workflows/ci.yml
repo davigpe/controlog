@@ -22,9 +22,22 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: controlog-backend/package-lock.json
-      - run: npm ci
+      # --ignore-scripts: nenhum pacote de terceiro roda script de instalacao
+      # no CI. O unico script de que o projeto precisa e o proprio postinstall
+      # (`prisma generate`), chamado explicitamente no passo seguinte. Pelo
+      # script do package.json, e nao por `npx`: o npx baixaria o pacote na
+      # hora se nao o achasse, e o script so usa o Prisma do package-lock.
+      - run: npm ci --ignore-scripts
+      - run: npm run prisma:generate
       - run: npm run lint
-      - run: npm test
+      # Com cobertura, e nao `npm test`: assim o minimo do jest.config.js
+      # (coverageThreshold) reprova o CI, e o lcov segue para o job `sonar`.
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: controlog-backend/coverage/lcov.info
+          retention-days: 7
 
   frontend:
     name: Frontend — lint, build e testes
@@ -39,10 +52,56 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: controlog-frontend/package-lock.json
-      - run: npm ci
+      # O frontend nao depende de nenhum script de instalacao: os binarios
+      # nativos (esbuild, rolldown) vem como optionalDependencies por
+      # plataforma.
+      - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run build
-      - run: npm test
+      # Mesmo motivo do backend: os thresholds do vite.config.ts passam a valer.
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-frontend
+          path: controlog-frontend/coverage/lcov.info
+          retention-days: 7
+
+  sonar:
+    name: Qualidade — SonarCloud
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    # O deploy nao espera este job, de proposito: o quality gate aparece no
+    # painel e no PR, mas uma queda de nota nao segura uma publicacao que
+    # passou em lint, testes e auditoria.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historico completo: o Sonar usa o blame para separar codigo novo
+          # de codigo antigo.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cobertura-backend
+          path: controlog-backend/coverage
+      - uses: actions/download-artifact@v4
+        with:
+          name: cobertura-frontend
+          path: controlog-frontend/coverage
+
+      # Jest e Vitest gravam o caminho relativo a propria pasta (`SF:src/...`),
+      # e o Sonar resolve a partir da raiz. Sem o prefixo, a cobertura aparece
+      # como 0% sem erro nenhum.
+      - name: Ajustar caminhos do lcov para a raiz
+        run: |
+          sed -i 's#^SF:#SF:controlog-backend/#' controlog-backend/coverage/lcov.info
+          sed -i 's#^SF:#SF:controlog-frontend/#' controlog-frontend/coverage/lcov.info
+
+      # Fixada no commit da v8.4.1, e nao na tag: e uma action de terceiro que
+      # recebe um token, e tag pode ser movida.
+      - uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   dependencias:
     name: Dependencias — auditoria
@@ -113,7 +172,9 @@ jobs:
 
     steps:
       - name: Autenticar na AWS por OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+        # Fixada no commit da v4, e nao na tag: e a action que recebe a
+        # credencial da AWS, e tag pode ser movida.
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1

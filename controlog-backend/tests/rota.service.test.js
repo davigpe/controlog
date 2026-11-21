@@ -272,3 +272,123 @@ describe('rota.service', () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });
+
+// Testes de caixa branca: cada um fecha um caminho ou uma combinação de
+// condições que a cobertura de branches mostrava como nunca exercitada. O
+// grafo, a complexidade ciclomática e a tabela de caminhos de cada função
+// estão em docs/TESTES_CAIXA_BRANCA.md; o identificador no nome do teste
+// (C1, RN05-B, RN02-...) é o da tabela.
+describe('rota.service — caixa branca', () => {
+  // Rota existente, sem motorista, veículo nem veículo próprio, para que o
+  // update chegue até a transação sem cair em nenhuma outra validação.
+  const rotaExistente = (campos = {}) => ({
+    id: 'r1',
+    codigo: 'RT-010',
+    status: 'ATIVA',
+    motoristaId: null,
+    veiculoId: null,
+    veiculoProprio: false,
+    ...campos,
+  });
+
+  function prismaComUpdateBemSucedido(existente) {
+    const prisma = buildPrismaMock();
+    prisma.rota.findUnique.mockResolvedValueOnce(existente);
+    prisma._tx.rota.update.mockImplementation(async ({ data }) => ({
+      ...dadosRotaValida,
+      ...existente,
+      ...data,
+      criadoEm: new Date(),
+      motorista: null,
+      veiculo: null,
+    }));
+    return prisma;
+  }
+
+  // rota.remove, caminho C1 (1-2-3): o único dos três que nenhum teste seguia.
+  test('remove C1: rota inexistente lança NotFoundError sem contar entregas nem excluir', async () => {
+    const prisma = buildPrismaMock();
+    prisma.rota.findUnique.mockResolvedValue(null);
+
+    const service = createRotaService(prisma);
+
+    await expect(service.remove('inexistente')).rejects.toBeInstanceOf(NotFoundError);
+    expect(prisma.entrega.count).not.toHaveBeenCalled();
+    expect(prisma.rota.delete).not.toHaveBeenCalled();
+  });
+
+  // RN05, decisão `data.codigo && data.codigo !== existente.codigo` com o
+  // segundo termo falso: é o que acontece ao salvar o formulário de edição sem
+  // mudar o código. Não pode consultar a unicidade, senão a rota colidiria
+  // consigo mesma.
+  test('update RN05-B: mesmo código da própria rota não consulta unicidade', async () => {
+    const prisma = prismaComUpdateBemSucedido(rotaExistente());
+
+    const service = createRotaService(prisma);
+    const rota = await service.update('r1', { codigo: 'RT-010' }, { perfil: 'OPERADOR' });
+
+    expect(rota.codigo).toBe('RT-010');
+    expect(prisma.rota.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  // RN05, decisão `codigoEmUso` falsa: código novo e livre.
+  test('update RN05-C: código novo e livre é aceito', async () => {
+    const prisma = prismaComUpdateBemSucedido(rotaExistente());
+    prisma.rota.findUnique.mockResolvedValueOnce(null);
+
+    const service = createRotaService(prisma);
+    const rota = await service.update('r1', { codigo: 'RT-099' }, { perfil: 'OPERADOR' });
+
+    expect(rota.codigo).toBe('RT-099');
+    expect(prisma.rota.findUnique).toHaveBeenLastCalledWith({ where: { codigo: 'RT-099' } });
+  });
+
+  // RN02, condição A && B && C com B falso: pedir ATIVA para uma rota que já
+  // está ativa não é reativação, então operador pode.
+  test('update RN02-B: status ATIVA em rota já ativa é permitido para operador', async () => {
+    const prisma = prismaComUpdateBemSucedido(rotaExistente({ status: 'ATIVA' }));
+
+    const service = createRotaService(prisma);
+    const rota = await service.update('r1', { status: 'ATIVA' }, { perfil: 'OPERADOR' });
+
+    expect(rota.status).toBe('ATIVA');
+  });
+
+  // RN02 com A falso: operador pode editar outros campos de uma rota
+  // concluída; o bloqueio é só sobre reativá-la.
+  test('update RN02-A: operador edita rota concluída sem reativá-la', async () => {
+    const prisma = prismaComUpdateBemSucedido(rotaExistente({ status: 'CONCLUIDA' }));
+
+    const service = createRotaService(prisma);
+    const rota = await service.update('r1', { origem: 'Blumenau, SC' }, { perfil: 'OPERADOR' });
+
+    expect(rota.status).toBe('CONCLUIDA');
+    expect(rota.origem).toBe('Blumenau, SC');
+  });
+
+  // RN02, B verdadeiro pelo outro valor do conjunto: CANCELADA, além de
+  // CONCLUIDA (já coberto acima).
+  test('update RN02-B2: operador não reativa rota cancelada', async () => {
+    const prisma = buildPrismaMock();
+    prisma.rota.findUnique.mockResolvedValue(rotaExistente({ status: 'CANCELADA' }));
+
+    const service = createRotaService(prisma);
+
+    await expect(
+      service.update('r1', { status: 'ATIVA' }, { perfil: 'OPERADOR' })
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // RN02, C pelo encadeamento opcional `actor?.perfil`: sem usuário, o padrão
+  // tem que ser bloquear, não liberar.
+  test('update RN02-C2: sem ator informado, reativação é bloqueada', async () => {
+    const prisma = buildPrismaMock();
+    prisma.rota.findUnique.mockResolvedValue(rotaExistente({ status: 'CONCLUIDA' }));
+
+    const service = createRotaService(prisma);
+
+    await expect(service.update('r1', { status: 'ATIVA' })).rejects.toBeInstanceOf(ForbiddenError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});

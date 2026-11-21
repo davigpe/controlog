@@ -1,5 +1,10 @@
 # 🚚 Controlog
 
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=davigpe_controlog&metric=alert_status)](https://sonarcloud.io/project/overview?id=davigpe_controlog)
+[![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=davigpe_controlog&metric=coverage)](https://sonarcloud.io/component_measures?id=davigpe_controlog&metric=coverage)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=davigpe_controlog&metric=code_smells)](https://sonarcloud.io/project/issues?id=davigpe_controlog&types=CODE_SMELL)
+[![Dívida técnica](https://sonarcloud.io/api/project_badges/measure?project=davigpe_controlog&metric=sqale_index)](https://sonarcloud.io/component_measures?id=davigpe_controlog&metric=sqale_index)
+
 Sistema de gestão logística para pequenas e médias empresas de transporte, com controle centralizado de rotas, motoristas, veículos e entregas.
 
 Este é o repositório do projeto de portfólio desenvolvido para a disciplina de Engenharia de Software (Católica SC). A especificação completa — contexto, personas, requisitos funcionais/não funcionais, regras de negócio e arquitetura — está no RFC do projeto.
@@ -185,7 +190,7 @@ npm test
 npm run test:coverage
 ```
 
-Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio.
+Veja [`docs/PLANO_DE_TESTES.md`](docs/PLANO_DE_TESTES.md) para a lista de casos de teste por funcionalidade e regra de negócio, e [`docs/TESTES_CAIXA_BRANCA.md`](docs/TESTES_CAIXA_BRANCA.md) para os testes de caixa branca: critérios de cobertura, grafo de fluxo, complexidade ciclomática e caminhos independentes das regras de negócio.
 
 ---
 
